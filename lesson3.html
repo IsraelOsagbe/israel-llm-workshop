@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 3: From Continuous to Discrete — Computational Fluid Dynamics</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<h1>Lesson 3: From Continuous to Discrete</h1>
+<p class="subtitle">Computational Fluid Dynamics — First Year Introduction</p>
+</header>
+
+<main>
+<nav class="breadcrumb">
+<a href="index.html">← Home</a> | <a href="lesson2.html">← Previous</a> | <a href="lesson4.html">Next: Solving the Discrete System →</a>
+</nav>
+
+<section>
+<h2>The Discretization Challenge</h2>
+<p>The Navier–Stokes equations are continuous PDEs. A computer can only store and manipulate a finite set of numbers. <strong>Discretization</strong> is the process of converting the continuous problem into a discrete algebraic system that a computer can solve.</p>
+
+<p>Three main decisions must be made:</p>
+<ol>
+<li><strong>Mesh (grid):</strong> How to divide the domain into discrete cells/points</li>
+<li><strong>Discretization method:</strong> How to approximate derivatives (finite difference, finite volume, finite element, spectral...)</li>
+<li><strong>Variable arrangement:</strong> Where to store unknowns (collocated vs. staggered)</li>
+</ol>
+</section>
+
+<section>
+<h2>Meshes: Structured vs. Unstructured</h2>
+
+<h3>Structured Meshes</h3>
+<p>Points indexed by <em>(i, j, k)</em> in 3D. Neighbors are <em>(i±1, j, k)</em>, etc. Advantages:</p>
+<ul>
+<li>Simple data structures, fast access</li>
+<li>Easy high-order schemes</li>
+<li>Efficient memory access patterns</li>
+</ul>
+<p>Disadvantage: Very hard to fit complex geometries (curved boundaries, internal features).</p>
+
+<h3>Unstructured Meshes</h3>
+<p>Arbitrary connectivity — each cell stores its neighbor list. Elements: triangles/tetrahedra, quadrilaterals/hexahedra, pyramids, prisms. Advantages:</p>
+<ul>
+<li>Handles arbitrarily complex geometries</li>
+<li>Local refinement easy (hanging nodes, polyhedral cells)</li>
+</ul>
+<p>Disadvantage: More memory, indirect addressing, harder high-order accuracy.</p>
+
+<h3>Hybrid Meshes</h3>
+<p>Structured boundary-layer meshes (prisms/hexahedra) near walls for accuracy, unstructured tetrahedra/polyhedra in the far field. This is the industry standard for external aerodynamics.</p>
+</section>
+
+<section>
+<h2>Finite Difference Method (FDM)</h2>
+<p>Approximate derivatives directly using Taylor series. For a uniform 1D grid with spacing <em>h</em>:</p>
+
+<p><strong>First derivative (central difference, 2nd-order):</strong></p>
+<pre><code>du/dx ≈ (u_{i+1} − u_{i−1}) / (2h)</code></pre>
+
+<p><strong>Second derivative (central difference, 2nd-order):</strong></p>
+<pre><code>d²u/dx² ≈ (u_{i+1} − 2u_i + u_{i−1}) / h²</code></pre>
+
+<p><strong>First derivative (upwind, 1st-order):</strong></p>
+<pre><code>du/dx ≈ (u_i − u_{i−1}) / h   (for positive flow direction)</code></pre>
+
+<p>FDM is simple but requires structured grids. It approximates the <strong>differential form</strong> of the PDE.</p>
+</section>
+
+<section>
+<h2>Finite Volume Method (FVM) — The CFD Workhorse</h2>
+<p>FVM integrates the PDE over each control volume (cell). The divergence theorem converts volume integrals of divergences to surface fluxes:</p>
+<pre><code>∫_V ∇·F dV = ∮_S F·n dS</code></pre>
+
+<p>For the continuity equation ∇·(ρu) = 0 integrated over cell <em>P</em>:</p>
+<pre><code>∑_faces (ρu·n)_f A_f = 0</code></pre>
+
+<p>where the sum is over all faces of the cell, <em>A_f</em> is face area, and <em>n</em> is the outward normal.</p>
+
+<p><strong>Key advantages of FVM:</strong></p>
+<ul>
+<li>Naturally conservative — fluxes leaving one cell enter its neighbor exactly</li>
+<li>Works on any mesh (structured or unstructured)</li>
+<li>Handles discontinuities (shocks) well</li>
+<li>Matches the physical control-volume intuition</li>
+</ul>
+
+<p>Almost all commercial CFD codes (ANSYS Fluent, OpenFOAM, STAR-CCM+) use FVM.</p>
+</section>
+
+<section>
+<h2>Finite Element Method (FEM)</h2>
+<p>Multiply the PDE by a test function, integrate over the domain, integrate by parts to move derivatives to the test function. Approximate the solution as a sum of basis functions (typically polynomials) defined on elements.</p>
+
+<p><strong>Strengths:</strong> Rigorous mathematical framework, natural high-order accuracy (p-refinement), excellent for structural mechanics and coupled problems.</p>
+<p><strong>In CFD:</strong> Used in COMSOL, some research codes, and increasingly for high-order LES/DNS. Less common in industrial RANS.</p>
+</section>
+
+<section>
+<h2>Variable Arrangement: Collocated vs. Staggered</h2>
+
+<h3>Staggered Grid (Harlow–Welch, MAC method)</h3>
+<p>Pressure at cell centers, velocity components at face centers.</p>
+<ul>
+<li><strong>Pro:</strong> No pressure-velocity decoupling (checkerboard modes)</li>
+<li><strong>Con:</strong> Complex on unstructured meshes, multiple velocity storage locations</li>
+</ul>
+
+<h3>Collocated Grid</h3>
+<p>All variables (p, u, v, w) stored at cell centers.</p>
+<ul>
+<li><strong>Pro:</strong> Simple data structure, natural for unstructured FVM</li>
+<li><strong>Con:</strong> Checkerboard pressure oscillations if not careful</li>
+<li><strong>Fix:</strong> Rhie–Chow interpolation — interpolate face velocities using pressure gradients to couple p and u</li>
+</ul>
+
+<p>Modern unstructured FVM codes almost universally use collocated grids with Rhie–Chow.</p>
+</section>
+
+<section>
+<h2>Order of Accuracy</h2>
+<p>A scheme is <em>p</em>-th order accurate if the truncation error scales as <em>O(h^p)</em>.</p>
+
+<ul>
+<li><strong>1st-order (upwind):</strong> Very diffusive, smears sharp gradients. Robust but inaccurate.</li>
+<li><strong>2nd-order (central, linear upwind):</strong> Standard for production RANS. Good balance.</li>
+<li><strong>Higher-order (≥3rd):</strong> Less diffusion, better for LES/DNS. More complex, can oscillate near discontinuities.</li>
+</ul>
+
+<p><strong>Rule of thumb:</strong> For a given mesh, 2nd-order FVM typically gives engineering accuracy for RANS. For LES, you want at least 2nd-order, preferably higher.</p>
+</section>
+
+<section class="socratic-section">
+<h2>Check Your Understanding</h2>
+
+<div class="socratic" data-question="fvm-conservation">
+<p><strong>Question 1:</strong> Why does the finite volume method guarantee conservation? Write the discrete continuity equation for a cell and show that the flux leaving one cell equals the flux entering its neighbor.</p>
+</div>
+
+<div class="socratic" data-question="checkerboard">
+<p><strong>Question 2:</strong> On a collocated grid, a "checkerboard" pressure field (alternating high/low in a checker pattern) produces zero pressure gradient at cell centers when using standard central differences. Explain why this happens, and how Rhie–Chow interpolation fixes it.</p>
+</div>
+
+<div class="socratic" data-question="mesh-choice">
+<p><strong>Question 3:</strong> You're simulating flow over a car with detailed underbody geometry (exhaust, suspension, diffuser). Would you choose a structured, unstructured, or hybrid mesh? Justify your choice with at least three reasons.</p>
+</div>
+
+</section>
+</main>
+
+<footer>
+<p><a href="lesson2.html">← Previous: The Governing Equations</a> | <a href="index.html">Home</a> | <a href="lesson4.html">Next: Solving the Discrete System →</a></p>
+</footer>
+<script src="socratic.js" defer></script>
+</body>
+</html>

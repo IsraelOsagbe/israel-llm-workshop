@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Module 4: Linear Solvers & Preconditioning — CFD Course</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<h1>Module 4: Linear Solvers &amp; Preconditioning</h1>
+<p class="subtitle">Krylov Theory, Multigrid, Physics-Based Preconditioning, Block Factorizations</p>
+</header>
+
+<main>
+<nav class="breadcrumb">
+<a href="index.html">← Course Home</a> | <a href="module3.html">← Previous</a> | <a href="module5.html">Next: Incompressible Flow Algorithms →</a>
+</nav>
+
+<section>
+<h2>4.1 Linear Systems in CFD: Structure &amp; Properties</h2>
+<p>Implicit time stepping, Newton linearization, and steady-state solves all require solving <strong>Ax = b</strong> where <em>A ∈ ℝ^{N×N}</em> is large, sparse, and structured.</p>
+
+<h3>Matrix Properties from PDE Discretization</h3>
+<table>
+<thead>
+<tr><th>PDE Type</th><th>Discretization</th><th>Matrix Properties</th></tr>
+</thead>
+<tbody>
+<tr><td>Elliptic (Poisson)</td><td>FV/FEM 2nd-order</td><td>Symmetric positive definite (SPD), M-matrix, diagonally dominant</td></tr>
+<tr><td>Advection–Diffusion</td><td>Upwind FV</td><td>Nonsymmetric, diagonally dominant for high Pe; SPD for central + diffusion</td></tr>
+<tr><td>Compressible Euler (implicit)</td><td>Roe/HLLC + time</td><td>Block-structured, nonsymmetric, indefinite (hyperbolic)</td></tr>
+<tr><td>Navier–Stokes (implicit)</td><td>FV + Newton</td><td>Block 5×5 (3D), nonsymmetric, saddle-point structure (incompressible)</td></tr>
+<tr><td>Incompressible (projection)</td><td>Pressure-Poisson</td><td>SPD (Laplacian), but Schur complement is dense</td></tr>
+</tbody>
+</table>
+
+<h3>Spectral Properties &amp; Conditioning</h3>
+<p>For a model Poisson problem on uniform mesh: <em>κ(A) ~ O(h⁻²)</em>. For advection-dominated: <em>κ(A) ~ O(h⁻¹)</em>. For high-Re NS: <em>κ(A) ~ O(Re·h⁻²)</em>. <strong>Condition number grows with refinement</strong> — necessitates preconditioning.</p>
+</section>
+
+<section>
+<h2>4.2 Krylov Subspace Methods: Theory</h2>
+<p>Given <em>Ax = b</em>, Krylov methods build solutions in <em>K_m(A, r_0) = span{r_0, A r_0, ..., A^{m-1} r_0}</em>.</p>
+
+<h3>Conjugate Gradient (CG) — SPD Only</h3>
+<p>Minimizes <em>||x − x*||_A</em> over <em>K_m</em>. Convergence bound:</p>
+<div class="equation-box">
+||x_m − x*||_A ≤ 2 ( (√κ − 1)/(√κ + 1) )^m ||x_0 − x*||_A
+</div>
+<p>CG converges in at most <em>N</em> steps (exact arithmetic). Requires only SpMV and dot products.</p>
+
+<h3>GMRES — General Nonsymmetric</h3>
+<p>Minimizes <em>||b − A x_m||_2</em> over <em>K_m</em>. Arnoldi process builds orthonormal basis <em>V_m</em>:</p>
+<div class="equation-box">
+A V_m = V_{m+1} H_m
+</div>
+<p>Cost: <em>O(mN)</em> storage, <em>O(m²N)</em> work per restart. <strong>Restarted GMRES(m)</strong> limits memory but may stall.</p>
+
+<h3>BiCGSTAB, TFQMR, IDR(s)</h3>
+<p>Short-recurrence methods for nonsymmetric systems. BiCGSTAB: 2 SpMV/iter, often faster than GMRES but can break down. IDR(s): robust, tunable dimension <em>s</em>.</p>
+
+<h3>Convergence Theory (Elman, Greenbaum, etc.)</h3>
+<p>GMRES convergence depends on <strong>field of values</strong> <em>F(A) = {x*Ax / x*x}</em> and <strong>pseudospectra</strong>. For normal matrices, depends on eigenvalue clustering. For non-normal, depends on departure from normality.</p>
+</section>
+
+<section>
+<h2>4.3 Preconditioning: Transforming the Spectrum</h2>
+<p>Left preconditioning: <em>M⁻¹Ax = M⁻¹b</em>. Right: <em>AM⁻¹y = b, x = M⁻¹y</em>. Goal: cluster eigenvalues of <em>M⁻¹A</em> near 1.</p>
+
+<h3>Classical Preconditioners</h3>
+<table>
+<thead>
+<tr><th>Preconditioner</th><th>Construction</th><th>Cost/iter</th><th>Parallel</th><th>Best For</th></tr>
+</thead>
+<tbody>
+<tr><td>Jacobi (diagonal)</td><td>D = diag(A)</td><td>O(N)</td><td>Trivial</td><td>Diagonally dominant, smoother</td></tr>
+<tr><td>Gauss–Seidel / SOR</td><td>D + L</td><td>O(N)</td><td>Sequential</td><td>Smoother, not standalone</td></tr>
+<tr><td>ILU(k)</td><td>Incomplete LU</td><td>O(N)</td><td>Hard</td><td>General nonsymmetric, serial</td></tr>
+<tr><td>Block Jacobi</td><td>Block-diagonal</td><td>O(N)</td><td>Good</td><td>Domain decomp, physics blocks</td></tr>
+<tr><td>Additive Schwarz</td><td>Overlapping blocks</td><td>O(N)</td><td>Good</td><td>Overlapping domain decomp</td></tr>
+</tbody>
+</table>
+
+<h3>Algebraic Multigrid (AMG) — The Gold Standard</h3>
+<p>AMG builds a hierarchy of coarser matrices <em>A_0, A_1, ..., A_L</em> purely algebraically:</p>
+<ol>
+<li><strong>Coarsening:</strong> Select C-points (coarse) and F-points (fine) via maximal independent set or compatible relaxation</li>
+<li><strong>Interpolation (Prolongation):</strong> <em>P_k : ℝ^{n_{k+1}} → ℝ^{n_k}</em> — smooth error interpolation</li>
+<li><strong>Restriction:</strong> <em>R_k = P_k^T</em> (Galerkin) or transpose</li>
+<li><strong>Coarse operator:</strong> <em>A_{k+1} = R_k A_k P_k</em></li>
+</ol>
+<p>V-cycle: smooth → restrict → coarse solve → prolongate → smooth. <strong>Mesh-independent convergence</strong> for elliptic problems.</p>
+
+<h3>AMG for Systems (Block AMG, Unknown-Based)</h3>
+<p>For Navier–Stokes, <strong>unknown-based AMG</strong> (e.g., BoomerAMG in hypre) treats each variable separately. <strong>Block AMG</strong> (e.g., ML in Trilinos) preserves block structure. <strong>Auxiliary-space AMG (AMS, ADS)</strong> for H(curl)/H(div) problems (MHD, FEM).</p>
+</section>
+
+<section>
+<h2>4.4 Physics-Based Preconditioning for Navier–Stokes</h2>
+<p>Generic algebraic preconditioners ignore physics. <strong>Physics-based preconditioners</strong> exploit block structure.</p>
+
+<h3>Block Factorization of the Newton Matrix</h3>
+<p>For compressible NS (5 equations in 3D), the Jacobian has 5×5 blocks per cell-face. For incompressible (staggered/collocated):</p>
+<div class="equation-box">
+J = [ A   B^T ]
+    [ B   0   ]
+</div>
+<p>where <em>A</em> ≈ momentum (velocity block), <em>B</em> ≈ discrete divergence, <em>B^T</em> ≈ gradient. The Schur complement is <em>S = −B A⁻¹ B^T</em> ≈ pressure-Poisson.</p>
+
+<h3>Pressure-Convection-Diffusion (PCD) Preconditioner</h3>
+<p>For incompressible flow (Kay, Loghin, Wathen, 2002):</p>
+<div class="equation-box">
+P_PCD⁻¹ = [ A⁻¹      0    ] [ I   −B^T ] [ I    0    ]
+           [ 0    (F_p A_p⁻¹ B_p^T)⁻¹ ] [ 0    I    ] [ 0   −B    ]
+</div>
+<p>where <em>A_p</em> is pressure mass matrix, <em>F_p</em> is pressure convection-diffusion operator. Requires only <strong>AMG on A</strong> and <strong>AMG on pressure-Poisson</strong>.</p>
+
+<h3>Least-Squares Commutator (LSC) Preconditioner</h3>
+<p>Approximates the Schur complement via <em>S ≈ B A⁻¹ B^T</em>. Computes <em>A⁻¹</em> approximately by solving a least-squares problem on the pressure space. Robust for high-Re, complex geometries.</p>
+
+<h3>Augmented Lagrangian Preconditioning</h3>
+<p>Modify the saddle-point system:</p>
+<div class="equation-box">
+J_γ = [ A + γ B^T W⁻¹ B   B^T ]
+       [ B                  0   ]
+</div>
+<p>For large <em>γ</em>, the Schur complement becomes <em>S_γ ≈ (1/γ) W</em> (mass matrix) — easily invertible with AMG. Trade-off: inner solves for <em>A + γ B^T W⁻¹ B</em> become harder.</p>
+</section>
+
+<section>
+<h2>4.5 Preconditioning for Compressible Flow</h2>
+
+<h3>Block Jacobi / Block ILU with Physics Ordering</h3>
+<p>Order variables as <em>(ρ, ρu, ρv, ρw, ρE)</em> per cell. Block Jacobi uses 5×5 block inverses. Block ILU(0) with this ordering captures inter-equation coupling exactly at the block level.</p>
+
+<h3>Low-Mach Preconditioning (Turkel, Weiss–Smith)</h3>
+<p>At low Ma, the Euler preconditioning matrix <em>Γ</em> modifies the time derivative:</p>
+<div class="equation-box">
+Γ ∂U/∂t + ∇·F = 0,    Γ = diag(1, 1, 1, 1, 1/Ma²)  (simplified)
+</div>
+<p>This clusters eigenvalues, removing the <em>1/Ma</em> stiffness. For implicit solves, use <em>Γ</em> in the Jacobian: <em>J = Γ/Δt + ∂R/∂U</em>.</p>
+
+<h3>All-Speed Preconditioners</h3>
+<p>Combine low-Mach preconditioning with IMEX splitting (Dimarco–Pareschi, 2017). Implicit part: acoustic + pressure; Explicit: convection. Preconditioner inverts the acoustic subsystem approximately.</p>
+</section>
+
+<section>
+<h2>4.6 Parallel Scalability &amp; Implementation</h2>
+
+<h3>Domain Decomposition</h3>
+<ul>
+<li><strong>Partitioning:</strong> ParMETIS, PT-Scotch, Zoltan — minimize edge cut, balance load</li>
+<li><strong>Ghost layers:</strong> 1 layer for 2nd-order, <em>k</em> layers for <em>k</em>-th order</li>
+<li><strong>Communication:</strong> MPI_Isend/Irecv for SpMV, overlap with computation</li>
+</ul>
+
+<h3>Scalable Preconditioners</h3>
+<ul>
+<li><strong>BoomerAMG (hypre):</strong> Algebraic multigrid, scales to 1M+ cores</li>
+<li><strong>ML/GMG (Trilinos):</strong> Geometric/Algebraic MG, flexible smoothing</li>
+<li><strong>PETSc PCFieldSplit:</strong> Block preconditioning framework (PCD, LSC, FBP)</li>
+<li><strong>GAMG (PETSc):</strong> Aggregation-based AMG</li>
+</ul>
+
+<h3>GPU Acceleration</h3>
+<ul>
+<li>SpMV: cuSPARSE, custom kernels (CSR, ELLPACK, SELL-C-σ)</li>
+<li>Preconditioners: Block Jacobi (trivial), ILU (hard), AMG (hard — use AMGX or hypre GPU)</li>
+<li>Krylov: cuSPARSE GEMV + custom kernels for dot products, AXPY</li>
+</ul>
+</section>
+
+<section>
+<h2>4.7 Newton–Krylov Methods for Nonlinear Systems</h2>
+<p>For steady problems or implicit time stepping, solve <em>F(U) = 0</em> via Newton:</p>
+<div class="equation-box">
+J(U^k) ΔU^k = −F(U^k),    U^{k+1} = U^k + α ΔU^k
+</div>
+<p>where <em>J = ∂F/∂U</em>. The linear solve is inexact: <em>||J ΔU + F|| ≤ η_k ||F||</em>.</p>
+
+<h3>Inexact Newton &amp; Forcing Terms</h3>
+<p><em>η_k = min(η_max, ||F(U^k)||^p)</em> (Eisenstat–Walker). Prevents oversolving early Newton steps.</p>
+
+<h3>Jacobian-Free Newton–Krylov (JFNK)</h3>
+<p>Matrix-free: <em>J v ≈ (F(U + εv) − F(U))/ε</em>. No Jacobian storage; requires only residual evaluations. Preconditioning is critical — use approximate Jacobian (lagged, simplified physics) for <em>M⁻¹</em>.</p>
+
+<h3>Globalization: Line Search &amp; Trust Region</h3>
+<p>Backtracking line search on <em>||F(U)||</em>. Trust region: <em>||ΔU|| ≤ Δ</em>. Essential for robustness on difficult problems (transonic, separated flows).</p>
+</section>
+
+<section class="socratic-section">
+<h2>Socratic Questions</h2>
+
+<div class="socratic" data-question="krylov-convergence">
+<p><strong>Question 1:</strong> Prove that for a symmetric positive definite matrix <em>A</em>, the CG method minimizes the <em>A</em>-norm of the error over the Krylov subspace. Derive the convergence bound <em>||e_m||_A ≤ 2((√κ−1)/(√κ+1))^m ||e_0||_A</em>. What does this imply about the number of iterations needed to reduce the error by a factor of 10⁻⁶ for κ = 10⁴?</p>
+</div>
+
+<div class="socratic" data-question="amg-coarsening">
+<p><strong>Question 2:</strong> In classical AMG (Ruge–Stüben), the coarse grid is chosen so that each fine point (F-point) is strongly connected to at least one coarse point (C-point). Define <strong>strong connection</strong> in terms of matrix entries. For a 5-point Laplacian on a uniform grid, show that standard coarsening yields a grid spacing of 2h on the coarse level.</p>
+</div>
+
+<div class="socratic" data-question="pcd-preconditioner">
+<p><strong>Question 3:</strong> For the incompressible Navier–Stokes saddle-point system, derive the exact block factorization of the Jacobian. Show that the Schur complement <em>S = −B A⁻¹ B^T</em> is spectrally equivalent to the pressure-Poisson operator. How does the PCD preconditioner approximate <em>A⁻¹</em> and why is the pressure convection-diffusion operator <em>F_p</em> needed?</p>
+</div>
+
+<div class="socratic" data-question="low-mach-precond">
+<p><strong>Question 4:</strong> The preconditioning matrix <em>Γ = diag(1, 1, 1, 1, 1/Ma²)</em> for the Euler equations modifies the time derivative. Compute the eigenvalues of <em>Γ⁻¹ A_n</em> where <em>A_n = ∂F/∂U · n</em> is the flux Jacobian in direction <em>n</em>. Show that the preconditioned system has eigenvalues that remain <em>O(1)</em> as <em>Ma → 0</em>, whereas the unpreconditioned system has eigenvalues <em>O(1/Ma)</em>.</p>
+</div>
+
+<div class="socratic" data-question="jnfk">
+<p><strong>Question 5:</strong> In Jacobian-Free Newton–Krylov (JFNK), the matrix-vector product <em>Jv</em> is approximated by finite differences: <em>Jv ≈ (F(U+εv)−F(U))/ε</em>. Analyze the optimal choice of <em>ε</em> balancing truncation error (<em>O(ε)</em>) and roundoff error (<em>O(ε_mach/ε)</em>). Why is a good preconditioner <strong>more critical</strong> in JFNK than in standard Newton–Krylov with exact Jacobian?</p>
+</div>
+
+</section>
+</main>
+
+<footer>
+<p><a href="module3.html">← Module 3: Time Integration &amp; Stability</a> | <a href="index.html">Course Home</a> | <a href="module5.html">Next: Incompressible Flow Algorithms →</a></p>
+</footer>
+<script src="socratic.js" defer></script>
+</body>
+</html>

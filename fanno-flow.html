@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fanno Flow Solver — Compressible Channel Example</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .solver-panel {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  .solver-panel h3 {
+    margin-top: 0;
+    color: #1e3a5f;
+  }
+  .input-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  .input-group label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 0.35rem;
+  }
+  .input-group input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 0.95rem;
+  }
+  .input-group input:focus {
+    outline: none;
+    border-color: #2c5282;
+    box-shadow: 0 0 0 2px rgba(44, 82, 130, 0.15);
+  }
+  .btn {
+    background: #2c5282;
+    color: white;
+    border: none;
+    padding: 0.6rem 1.5rem;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn:hover {
+    background: #1e3a5f;
+  }
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .result-card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 1rem;
+    text-align: center;
+  }
+  .result-card .label {
+    font-size: 0.8rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .result-card .value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1e3a5f;
+    margin-top: 0.25rem;
+  }
+  .plot-container {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .plot-container h4 {
+    margin: 0 0 1rem;
+    font-size: 1rem;
+    color: #1e3a5f;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 300px;
+  }
+  .channel-viz {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .channel-canvas {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    background: #fafafa;
+  }
+  .equation-box {
+    background: #1f2937;
+    color: #e5e7eb;
+    padding: 1rem;
+    border-radius: 6px;
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.875rem;
+    overflow-x: auto;
+    margin: 1rem 0;
+  }
+  .tabs {
+    display: flex;
+    border-bottom: 2px solid #e2e8f0;
+    margin-bottom: 1rem;
+  }
+  .tab {
+    padding: 0.75rem 1.5rem;
+    cursor: pointer;
+    font-weight: 500;
+    color: #6b7280;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.15s;
+  }
+  .tab.active {
+    color: #2c5282;
+    border-bottom-color: #2c5282;
+  }
+  .tab:hover:not(.active) {
+    color: #374151;
+  }
+  .tab-panel {
+    display: none;
+  }
+  .tab-panel.active {
+    display: block;
+  }
+  @media (max-width: 600px) {
+    .input-grid {
+      grid-template-columns: 1fr;
+    }
+    canvas {
+      height: 250px;
+    }
+  }
+</style>
+</head>
+<body>
+<header>
+<h1>Fanno Flow Solver</h1>
+<p class="subtitle">Compressible Channel Flow with Friction — Interactive Solution</p>
+</header>
+
+<main>
+<nav class="breadcrumb">
+<a href="index.html">← Home</a> | <a href="lesson2.html">← Lesson 2</a>
+</nav>
+
+<section class="intro">
+<h2>About This Solver</h2>
+<p>This page solves the <strong>Fanno flow</strong> problem: steady, adiabatic flow of a compressible fluid through a constant-area duct with friction. It corresponds to the "Compressible Channel Example" from <a href="lesson2.html">Lesson 2</a> (air at 300 m/s, Ma ≈ 0.86 in a 5 cm pipe).</p>
+<p>Fanno flow is characterized by:</p>
+<ul>
+<li>Constant stagnation temperature (adiabatic, no work)</li>
+<li>Entropy increases due to friction</li>
+<li>Mach number approaches 1 (choking) as duct length increases</li>
+<li>Subsonic flow accelerates; supersonic flow decelerates</li>
+</ul>
+<p>Adjust the inlet conditions below to see how the flow properties evolve along the channel.</p>
+</section>
+
+<section class="solver-panel">
+<h3>Inlet Conditions</h3>
+<div class="input-grid">
+  <div class="input-group">
+    <label>Inlet Mach Number (Ma₁)</label>
+    <input type="number" id="inletMa" value="0.86" min="0.01" max="5" step="0.01">
+  </div>
+  <div class="input-group">
+    <label>Inlet Temperature (K)</label>
+    <input type="number" id="inletT" value="300" min="50" max="2000" step="1">
+  </div>
+  <div class="input-group">
+    <label>Inlet Pressure (kPa)</label>
+    <input type="number" id="inletP" value="100" min="1" max="5000" step="1">
+  </div>
+  <div class="input-group">
+    <label>Specific Heat Ratio (γ)</label>
+    <input type="number" id="gamma" value="1.4" min="1.01" max="2" step="0.01">
+  </div>
+  <div class="input-group">
+    <label>Duct Diameter (m)</label>
+    <input type="number" id="diameter" value="0.05" min="0.001" max="1" step="0.001">
+  </div>
+  <div class="input-group">
+    <label>Friction Factor (f)</label>
+    <input type="number" id="friction" value="0.015" min="0.001" max="0.1" step="0.001">
+  </div>
+  <div class="input-group">
+    <label>Duct Length (m)</label>
+    <input type="number" id="length" value="50" min="0.1" max="1000" step="0.1">
+  </div>
+  <div class="input-group">
+    <label>Gas Constant R (J/kg·K)</label>
+    <input type="number" id="gasR" value="287" min="50" max="1000" step="1">
+  </div>
+</div>
+<button class="btn" onclick="solveFanno()">Solve &amp; Update Plots</button>
+
+<div class="results-grid" id="resultsGrid" style="display:none;">
+  <div class="result-card">
+    <div class="label">Max Length (L*/D)</div>
+    <div class="value" id="maxLength">—</div>
+  </div>
+  <div class="result-card">
+    <div class="label">Actual (fL/D)</div>
+    <div class="value" id="actualFLD">—</div>
+  </div>
+  <div class="result-card">
+    <div class="label">Exit Mach</div>
+    <div class="value" id="exitMa">—</div>
+  </div>
+  <div class="result-card">
+    <div class="label">Choked?</div>
+    <div class="value" id="chokedStatus">—</div>
+  </div>
+  <div class="result-card">
+    <div class="label">Exit Pressure (kPa)</div>
+    <div class="value" id="exitP">—</div>
+  </div>
+  <div class="result-card">
+    <div class="label">Exit Temp (K)</div>
+    <div class="value" id="exitT">—</div>
+  </div>
+  <div class="result-card">
+    <div class="label">Mass Flux (kg/m²·s)</div>
+    <div class="value" id="massFlux">—</div>
+  </div>
+  <div class="result-card">
+    <div class="label">Exit Velocity (m/s)</div>
+    <div class="value" id="exitU">—</div>
+  </div>
+</div>
+</section>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('plots')">Property Plots</button>
+  <button class="tab" onclick="showTab('channel')">Channel Visualization</button>
+  <button class="tab" onclick="showTab('equations')">Governing Equations</button>
+</div>
+
+<div id="tab-plots" class="tab-panel active">
+  <div class="plot-container">
+    <h4>Mach Number Along Duct</h4>
+    <canvas id="plotMa"></canvas>
+  </div>
+  <div class="plot-container">
+    <h4>Pressure &amp; Temperature (Normalized)</h4>
+    <canvas id="plotPT"></canvas>
+  </div>
+  <div class="plot-container">
+    <h4>Density &amp; Velocity (Normalized)</h4>
+    <canvas id="plotRhoU"></canvas>
+  </div>
+  <div class="plot-container">
+    <h4>Entropy Change &amp; Stagnation Pressure Ratio</h4>
+    <canvas id="plotEntropy"></canvas>
+  </div>
+</div>
+
+<div id="tab-channel" class="tab-panel">
+  <div class="channel-viz">
+    <h4 style="margin-top:0; text-align:center;">Channel Flow Contours</h4>
+    <p style="text-align:center; color:#6b7280; font-size:0.9rem;">Mach number contours along the duct (blue = low Ma, red = high Ma). Dashed line = sonic (Ma=1) condition.</p>
+    <canvas id="channelViz" class="channel-canvas" width="800" height="200"></canvas>
+    <div style="display:flex; justify-content:space-between; margin-top:1rem; font-size:0.8rem; color:#6b7280;">
+      <span>Inlet (x=0)</span>
+      <span id="channelMid">Mid</span>
+      <span id="channelExit">Exit (x=L)</span>
+    </div>
+  </div>
+</div>
+
+<div id="tab-equations" class="tab-panel">
+  <h3>Fanno Flow Governing Equations</h3>
+  <p>For steady, 1D, adiabatic flow in a constant-area duct with wall friction:</p>
+  
+  <div class="equation-box">
+Continuity:        ρu = G = constant
+Momentum:         dp + ρu du + (f/2D) ρu² dx = 0
+Energy:           h₀ = h + u²/2 = constant (stagnation enthalpy)
+Equation of State: p = ρRT
+  </div>
+
+  <h4>Dimensionless Form (Fanno Relations)</h4>
+  <div class="equation-box">
+fL*/D = (1-Ma²)/(γ·Ma²) + (γ+1)/(2γ) · ln[ (γ+1)Ma² / (2(1 + (γ-1)/2·Ma²)) ]
+
+T/T* = (γ+1) / (2 + (γ-1)Ma²)
+p/p* = 1/Ma · √[ (γ+1) / (2 + (γ-1)Ma²) ]
+ρ/ρ* = 1/Ma · √[ (2 + (γ-1)Ma²) / (γ+1) ]
+u/u* = Ma · √[ (γ+1) / (2 + (γ-1)Ma²) ]
+p₀/p₀* = (1/Ma) · [ (γ+1) / (2 + (γ-1)Ma²) ]^((γ+1)/(2(γ-1)))
+  </div>
+
+  <p><em>Star (*) denotes sonic (Ma=1) reference conditions. L* is the duct length required to choke the flow from the given Mach number.</em></p>
+
+  <h4>Key Physics</h4>
+  <ul>
+    <li><strong>Choking:</strong> When <em>fL/D ≥ fL*/D</em>, the flow chokes at the exit (Ma=1). Further length increase reduces mass flow rate.</li>
+    <li><strong>Subsonic branch:</strong> Friction accelerates flow (Ma ↑), decreases pressure &amp; density, increases velocity.</li>
+    <li><strong>Supersonic branch:</strong> Friction decelerates flow (Ma ↓), increases pressure &amp; density, decreases velocity.</li>
+    <li><strong>Second Law:</strong> Entropy always increases (<em>ds > 0</em>), stagnation pressure always decreases (<em>dp₀ < 0</em>).</li>
+  </ul>
+</div>
+
+</main>
+
+<footer>
+<p><a href="lesson2.html">← Back to Lesson 2</a> | <a href="index.html">Home</a></p>
+</footer>
+
+<script>
+// Fanno flow solver
+function fannoRelations(Ma, gamma) {
+  if (Ma <= 0) return null;
+  const g = gamma;
+  const gm1 = g - 1;
+  const gp1 = g + 1;
+  const Ma2 = Ma * Ma;
+  
+  // fL*/D
+  const term1 = (1 - Ma2) / (g * Ma2);
+  const term2 = (gp1 / (2 * g)) * Math.log((gp1 * Ma2) / (2 * (1 + gm1/2 * Ma2)));
+  const fLstarD = term1 + term2;
+  
+  // Property ratios relative to sonic conditions
+  const T_Tstar = gp1 / (2 + gm1 * Ma2);
+  const p_pstar = (1/Ma) * Math.sqrt(gp1 / (2 + gm1 * Ma2));
+  const rho_rhostar = (1/Ma) * Math.sqrt((2 + gm1 * Ma2) / gp1);
+  const u_ustar = Ma * Math.sqrt(gp1 / (2 + gm1 * Ma2));
+  const p0_p0star = (1/Ma) * Math.pow(gp1 / (2 + gm1 * Ma2), gp1 / (2 * gm1));
+  
+  return { fLstarD, T_Tstar, p_pstar, rho_rhostar, u_ustar, p0_p0star };
+}
+
+function solveFanno() {
+  const Ma1 = parseFloat(document.getElementById('inletMa').value);
+  const T1 = parseFloat(document.getElementById('inletT').value);
+  const P1 = parseFloat(document.getElementById('inletP').value) * 1000; // Pa
+  const gamma = parseFloat(document.getElementById('gamma').value);
+  const D = parseFloat(document.getElementById('diameter').value);
+  const f = parseFloat(document.getElementById('friction').value);
+  const L = parseFloat(document.getElementById('length').value);
+  const R = parseFloat(document.getElementById('gasR').value);
+  
+  if (isNaN(Ma1) || isNaN(T1) || isNaN(P1) || isNaN(gamma) || isNaN(D) || isNaN(f) || isNaN(L) || isNaN(R)) {
+    alert('Please fill in all fields with valid numbers');
+    return;
+  }
+  
+  const rel1 = fannoRelations(Ma1, gamma);
+  if (!rel1) return;
+  
+  const fLstarD1 = rel1.fLstarD;
+  const fLD_actual = f * L / D;
+  
+  // Check if choked
+  const choked = fLD_actual >= fLstarD1;
+  let Ma2, fLstarD2;
+  
+  if (choked) {
+    Ma2 = 1.0;
+    fLstarD2 = 0;
+  } else {
+    // Need to solve for Ma2 such that fLstarD2 = fLstarD1 - fLD_actual
+    const target = fLstarD1 - fLD_actual;
+    // Newton-Raphson to find Ma2
+    Ma2 = Ma1;
+    for (let iter = 0; iter < 50; iter++) {
+      const rel = fannoRelations(Ma2, gamma);
+      if (!rel) break;
+      const fLstarD = rel.fLstarD;
+      const diff = fLstarD - target;
+      if (Math.abs(diff) < 1e-10) break;
+      // Derivative of fL*/D w.r.t Ma
+      const Ma = Ma2;
+      const Ma2_ = Ma * Ma;
+      const g = gamma;
+      const gm1 = g - 1;
+      const gp1 = g + 1;
+      const deriv = -2/(g*Ma2_*Ma) - (gp1*gm1*Ma)/(g*(2+gm1*Ma2_)*Ma2_);
+      Ma2 -= diff / deriv;
+      if (Ma2 <= 0) Ma2 = 0.01;
+      if (Ma2 > 10) Ma2 = 10;
+    }
+    fLstarD2 = target;
+  }
+  
+  const rel2 = fannoRelations(Ma2, gamma);
+  
+  // Compute actual values at station 2
+  const T2 = T1 * (rel2.T_Tstar / rel1.T_Tstar);
+  const P2 = P1 * (rel2.p_pstar / rel1.p_pstar);
+  const rho1 = P1 / (R * T1);
+  const rho2 = rho1 * (rel2.rho_rhostar / rel1.rho_rhostar);
+  const u1 = Ma1 * Math.sqrt(gamma * R * T1);
+  const u2 = Ma2 * Math.sqrt(gamma * R * T2);
+  const G = rho1 * u1; // mass flux
+  
+  // Update results
+  document.getElementById('maxLength').textContent = fLstarD1.toFixed(3);
+  document.getElementById('actualFLD').textContent = fLD_actual.toFixed(3);
+  document.getElementById('exitMa').textContent = Ma2.toFixed(4);
+  document.getElementById('chokedStatus').textContent = choked ? 'YES' : 'NO';
+  document.getElementById('chokedStatus').style.color = choked ? '#dc2626' : '#16a34a';
+  document.getElementById('exitP').textContent = (P2/1000).toFixed(1);
+  document.getElementById('exitT').textContent = T2.toFixed(1);
+  document.getElementById('massFlux').textContent = G.toFixed(2);
+  document.getElementById('exitU').textContent = u2.toFixed(1);
+  document.getElementById('resultsGrid').style.display = 'grid';
+  
+  // Generate plots
+  generatePlots(Ma1, Ma2, gamma, fLstarD1, fLD_actual, choked, rel1, rel2, T1, P1, R);
+  drawChannelViz(Ma1, Ma2, gamma, fLstarD1, fLD_actual, choked);
+}
+
+function generatePlots(Ma1, Ma2, gamma, fLstarD1, fLD_actual, choked, rel1, rel2, T1, P1, R) {
+  const N = 100;
+  const x = [];
+  const Ma_arr = [];
+  const T_arr = [];
+  const P_arr = [];
+  const rho_arr = [];
+  const u_arr = [];
+  const s_arr = [];
+  const p0_arr = [];
+  
+  // Generate points along duct
+  for (let i = 0; i <= N; i++) {
+    const xi = i / N;
+    const fLD_local = fLD_actual * xi;
+    let Ma_local;
+    
+    if (choked && fLD_local >= fLstarD1) {
+      Ma_local = 1.0;
+    } else {
+      const target = fLstarD1 - fLD_local;
+      // Solve for Ma at this position
+      Ma_local = Ma1;
+      for (let iter = 0; iter < 30; iter++) {
+        const rel = fannoRelations(Ma_local, gamma);
+        if (!rel) break;
+        const diff = rel.fLstarD - target;
+        if (Math.abs(diff) < 1e-10) break;
+        const Ma = Ma_local;
+        const Ma2_ = Ma * Ma;
+        const g = gamma;
+        const gm1 = g - 1;
+        const gp1 = g + 1;
+        const deriv = -2/(g*Ma2_*Ma) - (gp1*gm1*Ma)/(g*(2+gm1*Ma2_)*Ma2_);
+        Ma_local -= diff / deriv;
+        if (Ma_local <= 0) Ma_local = 0.01;
+      }
+    }
+    
+    const rel = fannoRelations(Ma_local, gamma);
+    if (!rel) continue;
+    
+    x.push(xi);
+    Ma_arr.push(Ma_local);
+    T_arr.push(T1 * (rel.T_Tstar / rel1.T_Tstar));
+    P_arr.push(P1 * (rel.p_pstar / rel1.p_pstar) / 1000); // kPa
+    rho_arr.push((P1/(R*T1)) * (rel.rho_rhostar / rel1.rho_rhostar));
+    u_arr.push(Ma_local * Math.sqrt(gamma * R * (T1 * (rel.T_Tstar / rel1.T_Tstar))));
+    // Entropy change: s - s1 = cp*ln(T/T1) - R*ln(p/p1)
+    const cp = gamma * R / (gamma - 1);
+    s_arr.push(cp * Math.log(T_arr[T_arr.length-1]/T1) - R * Math.log(P_arr[P_arr.length-1]*1000/P1));
+    p0_arr.push(P_arr[P_arr.length-1] * Math.pow(1 + (gamma-1)/2 * Ma_local*Ma_local, gamma/(gamma-1)));
+  }
+  
+  // Plot 1: Mach number
+  drawPlot('plotMa', x, [Ma_arr], ['Mach'], '#2c5282', 'Mach Number', 1.0);
+  
+  // Plot 2: Pressure & Temperature (normalized)
+  const P_norm = P_arr.map(p => p / P_arr[0]);
+  const T_norm = T_arr.map(t => t / T_arr[0]);
+  drawPlot('plotPT', x, [P_norm, T_norm], ['p/p₁', 'T/T₁'], ['#dc2626', '#ea580c'], 'Normalized', 1.0);
+  
+  // Plot 3: Density & Velocity (normalized)
+  const rho_norm = rho_arr.map(r => r / rho_arr[0]);
+  const u_norm = u_arr.map(u => u / u_arr[0]);
+  drawPlot('plotRhoU', x, [rho_norm, u_norm], ['ρ/ρ₁', 'u/u₁'], ['#0891b2', '#7c3aed'], 'Normalized', 1.0);
+  
+  // Plot 4: Entropy & Stagnation pressure
+  const s_rel = s_arr.map(s => s / R); // dimensionless
+  const p0_norm = p0_arr.map(p => p / p0_arr[0]);
+  drawPlot('plotEntropy', x, [s_rel, p0_norm], ['Δs/R', 'p₀/p₀₁'], ['#db2777', '#16a34a'], 'Value', 1.0);
+}
+
+function drawPlot(canvasId, x, yArrays, labels, colors, yLabel, refLine) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 300 * dpr;
+  ctx.scale(dpr, dpr);
+  const w = rect.width;
+  const h = 300;
+  const pad = { top: 30, right: 20, bottom: 40, left: 60 };
+  const plotW = w - pad.left - pad.right;
+  const plotH = h - pad.top - pad.bottom;
+  
+  // Clear
+  ctx.clearRect(0, 0, w, h);
+  
+  // Find min/max
+  let yMin = Infinity, yMax = -Infinity;
+  yArrays.forEach(arr => {
+    arr.forEach(v => { yMin = Math.min(yMin, v); yMax = Math.max(yMax, v); });
+  });
+  if (refLine !== undefined) { yMin = Math.min(yMin, refLine); yMax = Math.max(yMax, refLine); }
+  const margin = (yMax - yMin) * 0.1;
+  yMin -= margin; yMax += margin;
+  
+  // Grid lines
+  ctx.strokeStyle = '#e5e7eb';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.top + (i/5) * plotH;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
+  }
+  for (let i = 0; i <= 5; i++) {
+    const x_ = pad.left + (i/5) * plotW;
+    ctx.beginPath(); ctx.moveTo(x_, pad.top); ctx.lineTo(x_, h - pad.bottom); ctx.stroke();
+  }
+  
+  // Axes
+  ctx.strokeStyle = '#9ca3af';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, h - pad.bottom);
+  ctx.lineTo(w - pad.right, h - pad.bottom); ctx.stroke();
+  
+  // Reference line at 1.0
+  if (refLine !== undefined) {
+    const yRef = pad.top + (1 - (refLine - yMin) / (yMax - yMin)) * plotH;
+    if (yRef >= pad.top && yRef <= h - pad.bottom) {
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath(); ctx.moveTo(pad.left, yRef); ctx.lineTo(w - pad.right, yRef); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#ef4444';
+      ctx.font = '10px sans-serif';
+      ctx.fillText('Ma=1', w - pad.right - 35, yRef - 4);
+    }
+  }
+  
+  // Data lines
+  yArrays.forEach((arr, idx) => {
+    ctx.strokeStyle = Array.isArray(colors) ? colors[idx] : colors;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    arr.forEach((v, i) => {
+      const px = pad.left + x[i] * plotW;
+      const py = pad.top + (1 - (v - yMin) / (yMax - yMin)) * plotH;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.stroke();
+  });
+  
+  // Legend
+  ctx.font = '11px sans-serif';
+  labels.forEach((label, idx) => {
+    ctx.fillStyle = Array.isArray(colors) ? colors[idx] : colors;
+    ctx.fillRect(pad.left + 10 + idx * 100, pad.top + 5, 15, 3);
+    ctx.fillStyle = '#374151';
+    ctx.fillText(label, pad.left + 30 + idx * 100, pad.top + 10);
+  });
+  
+  // X label
+  ctx.fillStyle = '#6b7280';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('x/L', w/2, h - 8);
+  ctx.textAlign = 'start';
+  
+  // Y label (rotated)
+  ctx.save();
+  ctx.translate(15, h/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.fillText(yLabel, 0, 0);
+  ctx.restore();
+}
+
+function drawChannelViz(Ma1, Ma2, gamma, fLstarD1, fLD_actual, choked) {
+  const canvas = document.getElementById('channelViz');
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+  const pad = 30;
+  const channelH = 80;
+  const channelY = (h - channelH) / 2;
+  const channelX0 = pad;
+  const channelX1 = w - pad;
+  const channelW = channelX1 - channelX0;
+  
+  ctx.clearRect(0, 0, w, h);
+  
+  // Generate Mach profile along channel
+  const N = 200;
+  const MaProfile = [];
+  for (let i = 0; i < N; i++) {
+    const xi = i / (N-1);
+    const fLD_local = fLD_actual * xi;
+    let Ma_local;
+    if (choked && fLD_local >= fLstarD1) {
+      Ma_local = 1.0;
+    } else {
+      const target = fLstarD1 - fLD_local;
+      Ma_local = Ma1;
+      for (let iter = 0; iter < 20; iter++) {
+        const rel = fannoRelations(Ma_local, gamma);
+        if (!rel) break;
+        const diff = rel.fLstarD - target;
+        if (Math.abs(diff) < 1e-8) break;
+        const Ma = Ma_local;
+        const Ma2_ = Ma * Ma;
+        const g = gamma;
+        const gm1 = g - 1;
+        const gp1 = g + 1;
+        const deriv = -2/(g*Ma2_*Ma) - (gp1*gm1*Ma)/(g*(2+gm1*Ma2_)*Ma2_);
+        Ma_local -= diff / deriv;
+        if (Ma_local <= 0) Ma_local = 0.01;
+      }
+    }
+    MaProfile.push(Ma_local);
+  }
+  
+  const MaMin = Math.min(...MaProfile);
+  const MaMax = Math.max(...MaProfile);
+  
+  // Draw filled contours (vertical slices)
+  for (let i = 0; i < N-1; i++) {
+    const x0 = channelX0 + (i/(N-1)) * channelW;
+    const x1 = channelX0 + ((i+1)/(N-1)) * channelW;
+    const Ma = (MaProfile[i] + MaProfile[i+1]) / 2;
+    const t = (Ma - MaMin) / (MaMax - MaMin);
+    const color = machToColor(t);
+    ctx.fillStyle = color;
+    ctx.fillRect(x0, channelY, x1 - x0, channelH);
+  }
+  
+  // Channel walls
+  ctx.strokeStyle = '#374151';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(channelX0, channelY); ctx.lineTo(channelX1, channelY);
+  ctx.moveTo(channelX0, channelY + channelH); ctx.lineTo(channelX1, channelY + channelH);
+  ctx.stroke();
+  
+  // Inlet/outlet arrows
+  ctx.fillStyle = '#374151';
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('→', channelX0 - 15, channelY + channelH/2 + 4);
+  ctx.fillText('→', channelX1 + 15, channelY + channelH/2 + 4);
+  ctx.textAlign = 'start';
+  
+  // Mach 1 reference line (if choked)
+  if (choked) {
+    const xChoke = channelX0 + (fLstarD1 / fLD_actual) * channelW;
+    if (xChoke > channelX0 && xChoke < channelX1) {
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 4]);
+      ctx.beginPath();
+      ctx.moveTo(xChoke, channelY - 5); ctx.lineTo(xChoke, channelY + channelH + 5);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#ef4444';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Choke (Ma=1)', xChoke, channelY - 10);
+      ctx.textAlign = 'start';
+    }
+  }
+  
+  // Mach number labels along top
+  ctx.fillStyle = '#1f2937';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center';
+  for (let i = 0; i <= 4; i++) {
+    const xi = i / 4;
+    const x = channelX0 + xi * channelW;
+    const Ma = MaProfile[Math.floor(xi * (N-1))];
+    ctx.fillText(`Ma=${Ma.toFixed(2)}`, x, channelY - 15);
+  }
+  ctx.textAlign = 'start';
+  
+  // Update labels below
+  document.getElementById('channelMid').textContent = `Mid (Ma≈${MaProfile[Math.floor(N/2)].toFixed(2)})`;
+  document.getElementById('channelExit').textContent = `Exit (Ma=${Ma2.toFixed(2)})${choked ? ' ★' : ''}`;
+}
+
+function machToColor(t) {
+  // Blue (cold) -> Cyan -> Yellow -> Red (hot)
+  if (t < 0.25) {
+    const r = 0, g = Math.round(255 * t/0.25), b = 255;
+    return `rgb(${r},${g},${b})`;
+  } else if (t < 0.5) {
+    const r = 0, g = 255, b = Math.round(255 * (1 - (t-0.25)/0.25));
+    return `rgb(${r},${g},${b})`;
+  } else if (t < 0.75) {
+    const r = Math.round(255 * (t-0.5)/0.25), g = 255, b = 0;
+    return `rgb(${r},${g},${b})`;
+  } else {
+    const r = 255, g = Math.round(255 * (1 - (t-0.75)/0.25)), b = 0;
+    return `rgb(${r},${g},${b})`;
+  }
+}
+
+function showTab(tabName) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + tabName).classList.add('active');
+  
+  if (tabName === 'channel') {
+    // Redraw channel viz with current values
+    const Ma1 = parseFloat(document.getElementById('inletMa').value);
+    const gamma = parseFloat(document.getElementById('gamma').value);
+    const D = parseFloat(document.getElementById('diameter').value);
+    const f = parseFloat(document.getElementById('friction').value);
+    const L = parseFloat(document.getElementById('length').value);
+    const rel1 = fannoRelations(Ma1, gamma);
+    const fLstarD1 = rel1.fLstarD;
+    const fLD_actual = f * L / D;
+    const choked = fLD_actual >= fLstarD1;
+    let Ma2 = choked ? 1.0 : Ma1;
+    if (!choked) {
+      const target = fLstarD1 - fLD_actual;
+      Ma2 = Ma1;
+      for (let iter = 0; iter < 50; iter++) {
+        const rel = fannoRelations(Ma2, gamma);
+        if (!rel) break;
+        const diff = rel.fLstarD - target;
+        if (Math.abs(diff) < 1e-10) break;
+        const Ma = Ma2;
+        const Ma2_ = Ma * Ma;
+        const g = gamma;
+        const gm1 = g - 1;
+        const gp1 = g + 1;
+        const deriv = -2/(g*Ma2_*Ma) - (gp1*gm1*Ma)/(g*(2+gm1*Ma2_)*Ma2_);
+        Ma2 -= diff / deriv;
+        if (Ma2 <= 0) Ma2 = 0.01;
+      }
+    }
+    drawChannelViz(Ma1, Ma2, gamma, fLstarD1, fLD_actual, choked);
+  }
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', () => {
+  solveFanno();
+});
+</script>
+</body>
+</html>

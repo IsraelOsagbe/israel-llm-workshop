@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Class Presentation: Tavares Breakage Model for Proppants</title>
+    <link rel="stylesheet" href="presentation.css">
+</head>
+<body>
+    <div class="presentation">
+        <!-- Slide 1: Title -->
+        <section class="slide title-slide">
+            <h1>Tavares Breakage Model Parameters for Proppants</h1>
+            <h2>Calibration for ANSYS Rocky DEM to Match Hu Sun et al. (2022)</h2>
+            <p class="subtitle">Workshop Presentation — Israel LLM Workshop</p>
+            <p class="date">November 11, 2026</p>
+        </section>
+
+        <!-- Slide 2: Problem Statement -->
+        <section class="slide">
+            <h1>The Problem</h1>
+            <ul>
+                <li>ANSYS Rocky DEM v4.3+ implements the <strong>Tavares breakage model</strong> (Tavares et al., 2020)</li>
+                <li>Model requires <strong>17 parameters</strong> for breakage probability, damage accumulation, fragment distribution</li>
+                <li>We need to simulate <strong>quartz sand</strong> and <strong>ceramic proppants</strong> (CarboAir, CarboLite)</li>
+                <li>Target: Match <strong>Hu Sun et al. (2022)</strong> fracture conductivity & breakage data</li>
+                <li><strong>Critical issue:</strong> No published Tavares parameters exist for any proppant material</li>
+            </ul>
+        </section>
+
+        <!-- Slide 3: Tavares Model Overview -->
+        <section class="slide">
+            <h1>The Tavares Breakage Model (Rocky DEM)</h1>
+            <div class="two-col">
+                <div>
+                    <h3>Breakage Probability</h3>
+                    <ul>
+                        <li>E∞ — asymptotic fracture energy (J/kg)</li>
+                        <li>d₀ — characteristic size (mm)</li>
+                        <li>φ — size-effect exponent</li>
+                        <li>σ — lognormal variance</li>
+                    </ul>
+                    <p>E₅₀(d) = E∞ / [1 + (d/d₀)^φ]</p>
+                </div>
+                <div>
+                    <h3>Damage Accumulation</h3>
+                    <ul>
+                        <li>γ — damage accumulation coefficient</li>
+                        <li>D = 2γ/(2γ-5) · (Eₖ/E)^(2γ/5)</li>
+                    </ul>
+                    <h3>Fragment Distribution</h3>
+                    <ul>
+                        <li>A — max t₁₀ (%)</li>
+                        <li>b′ — energy sensitivity</li>
+                        <li>αₙ/βₙ for n=1.2,1.5,2,4,25,50,75</li>
+                    </ul>
+                </div>
+            </div>
+            <p class="source">Tavares et al. (2020), <em>Powder Technology</em> 362:208–220</p>
+        </section>
+
+        <!-- Slide 4: The Calibration Gap -->
+        <section class="slide">
+            <h1>The Calibration Gap</h1>
+            <div class="alert">
+                <h3>⚠️ No Tavares parameters published for proppants</h3>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>Material Class</th><th>Surrogate in Tavares et al. (2020)</th><th>E∞ (J/kg)</th><th>d₀ (mm)</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Quartz Sand (frac sand)</td><td>Copper ore (strongest)</td><td>213.5</td><td>8.07</td></tr>
+                    <tr><td>Ceramics (CarboAir, CarboLite)</td><td>Limestone (weakest)</td><td>7.0</td><td>100</td></tr>
+                </tbody>
+            </table>
+            <p><strong>All 17 parameters assumed from surrogates</strong> — explicitly flagged in values_mine.csv</p>
+        </section>
+
+        <!-- Slide 5: Proposed Parameters -->
+        <section class="slide">
+            <h1>Proposed Parameters (Best Available)</h1>
+            <table>
+                <thead>
+                    <tr><th>Parameter</th><th>Quartz Sand</th><th>Ceramics</th><th>Assumption</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>E∞</td><td>213.5 J/kg</td><td>7.0 J/kg</td><td>Cu ore / Limestone</td></tr>
+                    <tr><td>d₀</td><td>8.07 mm</td><td>100 mm</td><td>Cu ore / Limestone</td></tr>
+                    <tr><td>φ</td><td>1.22</td><td>0.80</td><td>Cu ore / Limestone</td></tr>
+                    <tr><td>σ</td><td>0.799</td><td>0.801</td><td>Cu ore / Limestone</td></tr>
+                    <tr><td>γ</td><td>5.0</td><td>5.4</td><td>Cu ore / Limestone</td></tr>
+                    <tr><td>A</td><td>67.7%</td><td>53.3%</td><td>Cu ore / Limestone</td></tr>
+                    <tr><td>b′</td><td>0.029</td><td>0.033</td><td>Cu ore / Limestone</td></tr>
+                </tbody>
+            </table>
+            <p>Full 17-parameter table + physical properties in <code>values_mine.csv</code></p>
+        </section>
+
+        <!-- Slide 6: Calibration Targets - Hu Sun et al. (2022) -->
+        <section class="slide">
+            <h1>Calibration Targets: Hu Sun et al. (2022)</h1>
+            <h3>Conductivity vs. Closure Stress (Figure 6)</h3>
+            <table>
+                <thead>
+                    <tr><th>Stress (MPa)</th><th>20/40 Ceramic</th><th>40/70 Ceramic</th><th>20/40 Sand</th><th>40/70 Sand</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>10</td><td>~1800</td><td>~600</td><td>~300</td><td>~150</td></tr>
+                    <tr><td>30</td><td>~300</td><td>~120</td><td>~20</td><td>~10</td></tr>
+                    <tr><td>70</td><td>62</td><td>~15</td><td>3</td><td>~1</td></tr>
+                </tbody>
+            </table>
+            <h3>Breakage Rate at 70 MPa (Figure 10)</h3>
+            <table>
+                <thead>
+                    <tr><th>PS (Sand Vol.%)</th><th>20/40 Breakage</th><th>40/70 Breakage</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>0 (Pure Ceramic)</td><td>21.22%</td><td>12.30%</td></tr>
+                    <tr><td>0.50</td><td>~25%</td><td>~18%</td></tr>
+                    <tr><td>1.0 (Pure Sand)</td><td>45.68%</td><td>30.39%</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Slide 7: Hu Sun's Empirical Model -->
+        <section class="slide">
+            <h1>Hu Sun's Empirical Conductivity Model</h1>
+            <p>Logarithmic form: kWf = C₁·ln(σ) + C₂</p>
+            <div class="two-col">
+                <div class="card">
+                    <h3>20/40 Mesh</h3>
+                    <p>C₁ = 32.344·PS – 109.371</p>
+                    <p>C₂ = 203.87·PS – 518.86</p>
+                </div>
+                <div class="card">
+                    <h3>40/70 Mesh</h3>
+                    <p>C₁ = 5.8535·PS – 25.844</p>
+                    <p>C₂ = 43.574·PS – 123.28</p>
+                </div>
+            </div>
+            <p>R² > 0.97 for all mixes — this is our validation target for Rocky DEM</p>
+        </section>
+
+        <!-- Slide 8: Six Hypotheses Tested -->
+        <section class="slide">
+            <h1>Six Hypotheses Tested & Rejected</h1>
+            <div class="hypothesis-list">
+                <div class="hypothesis rejected">
+                    <h4>H1: Limestone params work for CarboAir/CarboLite</h4>
+                    <p>❌ Different fracture mechanics (cleavage vs. transgranular)</p>
+                </div>
+                <div class="hypothesis rejected">
+                    <h4>H2: Copper ore params work for quartz sand</h4>
+                    <p>❌ Different strength scale (cu ore ≫ frac sand)</p>
+                </div>
+                <div class="hypothesis rejected">
+                    <h4>H3: CarboAir & CarboLite share parameters</h4>
+                    <p>❌ SG 2.0 vs 2.71; different crush resistance (12% vs 17K psi)</p>
+                </div>
+                <div class="hypothesis rejected">
+                    <h4>H4: Hu Sun ceramics = CarboAir/CarboLite</h4>
+                    <p>❌ Chinese ceramic, density 1.43–1.46 vs 1.15/1.57</p>
+                </div>
+                <div class="hypothesis partial">
+                    <h4>H5: Tavares size function captures size effect</h4>
+                    <p>⚠️ Model predicts NO size effect at proppant scale (d₀=8–100mm, d=0.2–0.4mm)</p>
+                </div>
+                <div class="hypothesis rejected">
+                    <h4>H6: γ calibrates from Mark et al. 250-day decline</h4>
+                    <p>❌ Static fatigue ≠ impact damage accumulation</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 9: The Core Problem - Scale Mismatch -->
+        <section class="slide">
+            <h1>The Core Problem: Scale Mismatch</h1>
+            <div class="equation">
+                E₅₀(d) = E∞ / [1 + (d/d₀)^φ]
+            </div>
+            <div class="two-col">
+                <div class="card">
+                    <h3>Tavares Model Design</h3>
+                    <ul>
+                        <li>Comminution: 1–100 mm particles</li>
+                        <li>d₀ = 8.07 mm (cu ore) or 100 mm (limestone)</li>
+                        <li>Size effect activates at d ~ d₀</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>Proppant Reality</h3>
+                    <ul>
+                        <li>Proppants: 0.2–0.4 mm (200–400 μm)</li>
+                        <li>d/d₀ ≈ 0.002–0.04</li>
+                        <li>E₅₀ ≈ E∞ (constant) — NO size effect</li>
+                    </ul>
+                </div>
+            </div>
+            <p class="highlight">But experiments SHOW strong size effect: 20/40 sand Br=45.68% vs 40/70 Br=30.39% (1.5×)</p>
+        </section>
+
+        <!-- Slide 10: Research Gap - Next Generation Idea -->
+        <section class="slide">
+            <h1>Research Gap: Dual-Mechanism Size Function</h1>
+            <div class="equation">
+                E₅₀(d) = E∞ / [1 + (d/d₀)^φ]  ×  [1 + ψ·exp(-d/δ)]   for d < 1 mm
+            </div>
+            <div class="two-col">
+                <div>
+                    <h3>Term 1: Comminution Scale</h3>
+                    <p>Original Tavares function (d₀ ~ 10 mm)</p>
+                </div>
+                <div>
+                    <h3>Term 2: Proppant Scale (NEW)</h3>
+                    <ul>
+                        <li>ψ — amplitude of proppant-scale size effect</li>
+                        <li>δ — characteristic length (~100–300 μm)</li>
+                        <li>Surface-flaw → volume-flaw transition</li>
+                    </ul>
+                </div>
+            </div>
+            <h3>Calibration Path (Actionable)</h3>
+            <ol>
+                <li>Use Man & Wong (2017) single-grain data: failure force vs. grain height (10–13 grains/type)</li>
+                <li>Fit ψ and δ for sand, LD ceramic, HD ceramic</li>
+                <li>Implement in Rocky DEM via user breakage model</li>
+                <li>Validate against Hu Sun breakage rates at 70 MPa</li>
+            </ol>
+        </section>
+
+        <!-- Slide 11: What Remains Unexplained -->
+        <section class="slide">
+            <h1>What Remains Unexplained</h1>
+            <table>
+                <thead>
+                    <tr><th>Issue</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>No direct Tavares parameters for any proppant</td><td class="flag">Fundamental gap</td></tr>
+                    <tr><td>Size function inactive at proppant scale</td><td class="flag">Model limitation</td></tr>
+                    <tr><td>CarboAir vs CarboLite differentiation</td><td class="flag">Assumed identical</td></tr>
+                    <tr><td>Static fatigue (time) vs impact damage (γ)</td><td class="flag">Different physics</td></tr>
+                    <tr><td>Hu Sun ceramic ≠ CarboAir/CarboLite</td><td class="flag">Representative only</td></tr>
+                    <tr><td>Mixed proppant breakage (PS 0.25–0.75)</td><td class="flag">No mixing rule in model</td></tr>
+                    <tr><td>Conductivity ↔ Breakage mechanistic link</td><td class="flag">Empirical only</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Slide 12: Recommended Simulation Setup -->
+        <section class="slide">
+            <h1>Recommended ANSYS Rocky Setup</h1>
+            <h3>Critical Adjustments to Default Parameters</h3>
+            <ul>
+                <li><strong>Override E₅₀ per size class</strong> using Hu Sun breakage rates:
+                    <ul>
+                        <li>20/40 sand: target Br=45.68% at 70 MPa → back-calculate E₅₀</li>
+                        <li>40/70 sand: target Br=30.39% at 70 MPa → back-calculate E₅₀</li>
+                        <li>20/40 ceramic: target Br=21.22% at 70 MPa</li>
+                        <li>40/70 ceramic: target Br=12.30% at 70 MPa</li>
+                    </ul>
+                </li>
+                <li><strong>Differentiate Young's modulus</strong>:
+                    <ul>
+                        <li>Sand: 81 GPa (Man & Wong Baylic Sand)</li>
+                        <li>CarboAir: ~50 GPa (Hydroprop-like)</li>
+                        <li>CarboLite: ~130 GPa (OxSteel-like)</li>
+                    </ul>
+                </li>
+                <li><strong>Contact model</strong>: Hysteretic linear spring (Tavares et al. 2020)</li>
+                <li><strong>Friction</strong>: p-p 0.8, p-steel 0.5; Restitution 0.3</li>
+                <li><strong>Min progeny</strong>: 1/22 parent size; Polyhedral, 25 corners, superquadric degree 3.0</li>
+            </ul>
+        </section>
+
+        <!-- Slide 13: Why This Matters -->
+        <section class="slide">
+            <h1>Why This Matters</h1>
+            <div class="two-col">
+                <div class="card">
+                    <h3>For Industry</h3>
+                    <ul>
+                        <li>Proppant selection affects well productivity & EUR</li>
+                        <li>Sand vs ceramic: 10× cost difference</li>
+                        <li>Current DEM simulations use guessed parameters</li>
+                        <li>Better parameters → better fracture design</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>For Research</h3>
+                    <ul>
+                        <li>Exposes scale gap in breakage models</li>
+                        <li>Dual-mechanism function is testable & implementable</li>
+                        <li>Man & Wong (2017) data already exists for calibration</li>
+                        <li>Path to proppant-specific breakage models</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 14: Resources -->
+        <section class="slide">
+            <h1>Resources & Deliverables</h1>
+            <ul>
+                <li><strong>Data:</strong> <code>results/values_mine.csv</code> — all parameters with sources & assumptions</li>
+                <li><strong>Analysis:</strong> <code>results/answer_mine.md</code> — full documentation</li>
+                <li><strong>Website:</strong> <code>site/index.html</code> & <code>site/hypothesis.html</code></li>
+                <li><strong>Live:</strong> https://solid-giggle-rxp6qpg99x4fpp4w-8000.app.github.dev/</li>
+            </ul>
+            <h3>Key References</h3>
+            <ol class="refs">
+                <li>Hu Sun et al. (2022). <em>ACS Omega</em> 7:10243–10254</li>
+                <li>Tavares et al. (2020). <em>Powder Technology</em> 362:208–220</li>
+                <li>Man & Wong (2017). <em>J. Pet. Sci. Eng.</em> 158:268–283</li>
+                <li>Mark et al. (2022). SPE-205272-MS</li>
+                <li>Sutradhor & Ghassemi (2025). SGP-TR-229</li>
+            </ol>
+        </section>
+
+        <!-- Slide 15: Questions -->
+        <section class="slide title-slide">
+            <h1>Questions?</h1>
+            <p class="subtitle">The dual-mechanism size function is the next step — who wants to implement it?</p>
+        </section>
+    </div>
+
+    <div class="navigation">
+        <button id="prevBtn" onclick="prevSlide()">← Previous</button>
+        <span id="slideCounter">1 / 15</span>
+        <button id="nextBtn" onclick="nextSlide()">Next →</button>
+    </div>
+
+    <script src="presentation.js"></script>
+</body>
+</html>

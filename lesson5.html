@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 5: The CFD Workflow — Computational Fluid Dynamics</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<h1>Lesson 5: The CFD Workflow</h1>
+<p class="subtitle">Computational Fluid Dynamics — First Year Introduction</p>
+</header>
+
+<main>
+<nav class="breadcrumb">
+<a href="index.html">← Home</a> | <a href="lesson4.html">← Previous</a>
+</nav>
+
+<section>
+<h2>The End-to-End Process</h2>
+<p>Running a CFD simulation is not "meshing and hitting run." A professional workflow has distinct phases, each with decisions that affect the final result:</p>
+
+<ol>
+<li><strong>Problem Definition</strong> — What question are you answering?</li>
+<li><strong>Pre-processing</strong> — Geometry, mesh, physics setup, boundary conditions</li>
+<li><strong>Solving</strong> — Solver settings, initialization, monitoring, convergence</li>
+<li><strong>Post-processing</strong> — Visualization, quantitative extraction, uncertainty assessment</li>
+<li><strong>Verification &amp; Validation (V&amp;V)</strong> — Is the math right? Is the physics right?</li>
+</ol>
+
+<p>Skipping or rushing any phase is the most common source of wrong answers.</p>
+</section>
+
+<section>
+<h2>Phase 1: Problem Definition</h2>
+<p>Before opening a mesher, write down:</p>
+<ul>
+<li><strong>Quantity of interest (QoI):</strong> Drag coefficient? Pressure drop? Temperature distribution? Mixing efficiency?</li>
+<li><strong>Required accuracy:</strong> ±1%? ±10%? Order of magnitude?</li>
+<li><strong>Flow regime:</strong> Incompressible/compressible? Laminar/turbulent? Steady/unsteady? Single/multi-phase?</li>
+<li><strong>Resources:</strong> Compute budget (core-hours), wall-clock deadline, license constraints</li>
+<li><strong>Comparison data:</strong> Experimental data? Previous simulations? Analytical solution?</li>
+</ul>
+
+<p><strong>Example:</strong> "Predict the drag coefficient of a NACA 0012 airfoil at Re = 6×10⁶, M = 0.15, α = 1.25° to within ±5% of the NASA experimental data, using ≤ 5000 core-hours."</p>
+</section>
+
+<section>
+<h2>Phase 2: Pre-processing</h2>
+
+<h3>Geometry Preparation</h3>
+<ul>
+<li>Clean CAD: remove fillets/chamfers smaller than mesh resolution, fix gaps, simplify non-critical features</li>
+<li>Extract fluid volume (not the solid!)</li>
+<li>Create named selections for boundaries: inlet, outlet, walls, symmetry, periodic</li>
+</ul>
+
+<h3>Mesh Generation — The Most Time-Consuming Step</h3>
+<ul>
+<li><strong>Boundary layer resolution:</strong> First cell height set by target <em>y⁺</em> (≈1 for wall-resolved LES, 30–300 for wall-function RANS)</li>
+<li><strong>Growth rate:</strong> ≤ 1.2 in boundary layer, ≤ 1.3 elsewhere</li>
+<li><strong>Orthogonality &amp; skewness:</strong> Check mesh quality metrics; bad cells kill convergence and accuracy</li>
+<li><strong>Refinement zones:</strong> Wake, shear layers, shocks, separation regions</li>
+<li><strong>Mesh independence study:</strong> Run at least 3 mesh densities (coarse/medium/fine), plot QoI vs. cell count — it should plateau</li>
+</ul>
+
+<h3>Physics Setup</h3>
+<ul>
+<li>Governing equations: RANS, LES, DNS, potential flow, Euler?</li>
+<li>Turbulence model: k–ω SST (default), k–ε, SST-LES, WMLES, etc.</li>
+<li>Fluid properties: constant or variable? Ideal gas? Real gas table?</li>
+<li>Reference values: for non-dimensionalizing outputs (drag coeff, etc.)</li>
+</ul>
+
+<h3>Boundary Conditions — Garbage In, Garbage Out</h3>
+<ul>
+<li><strong>Inlet:</strong> Velocity profile (uniform, parabolic, measured), turbulence intensity &amp; length scale (or k, ω, ε)</li>
+<li><strong>Outlet:</strong> Pressure outlet (most robust), outflow, or far-field. Avoid fixed velocity at outlet.</li>
+<li><strong>Walls:</strong> No-slip (default), slip (symmetry), moving wall, rough wall</li>
+<li><strong>Symmetry/Periodic:</strong> Only if flow physics truly symmetric/periodic</li>
+</ul>
+</section>
+
+<section>
+<h2>Phase 3: Solving</h2>
+
+<h3>Initialization</h3>
+<ul>
+<li>Uniform flow (simple, may diverge for separated flows)</li>
+<li>Potential flow solution (fast, good for attached flows)</li>
+<li>Restart from a similar converged case (best for parametric studies)</li>
+</ul>
+
+<h3>Solver Settings</h3>
+<ul>
+<li>Steady vs. unsteady: RANS is usually steady; LES must be unsteady</li>
+<li>Time step (unsteady): CFL ≈ 1–5 for LES, up to 50–100 for steady with local time stepping</li>
+<li>Under-relaxation: Critical for steady segregated solvers (pressure 0.3–0.7, momentum 0.5–0.9)</li>
+<li>Discretization schemes: 2nd-order upwind for momentum, PRESTO! or 2nd-order for pressure</li>
+</ul>
+
+<h3>Monitoring Convergence</h3>
+<p>Watch <strong>residuals</strong> AND <strong>physical monitors</strong> (drag, lift, pressure drop, mass flow):</p>
+<ul>
+<li>Residuals: 3–4 orders of magnitude drop, then flat</li>
+<li>Monitors: Plateau to constant value (oscillate for unsteady)</li>
+<li>Mass imbalance: &lt; 0.1% of inlet mass flow</li>
+</ul>
+
+<p>If residuals stall but monitors are flat → solution may be converged. If monitors drift → not converged.</p>
+</section>
+
+<section>
+<h2>Phase 4: Post-processing</h2>
+
+<h3>Visualization</h3>
+<ul>
+<li>Contours: Pressure, velocity magnitude, Mach number, temperature</li>
+<li>Vectors/Streamlines: Flow direction, separation, recirculation</li>
+<li>Wall quantities: <em>y⁺</em>, wall shear stress, pressure coefficient Cp</li>
+<li>Cut planes / isosurfaces: Vorticity (Q-criterion, λ₂), total pressure loss</li>
+</ul>
+
+<h3>Quantitative Extraction</h3>
+<ul>
+<li>Force reports: Drag, lift, moment coefficients (integrate pressure + shear)</li>
+<li>Surface integrals: Average pressure, temperature, heat flux</li>
+<li>Mass flow verification: Inlet = outlet + leakage</li>
+<li>Profiles: Velocity/temperature at key stations for comparison with experiment</li>
+</ul>
+
+<h3>Uncertainty Quantification (UQ)</h3>
+<p>Every CFD result has uncertainty from:</p>
+<ul>
+<li><strong>Discretization error:</strong> Mesh convergence study (Richardson extrapolation gives error estimate)</li>
+<li><strong>Iteration error:</strong> Residual level at stop</li>
+<li><strong>Model-form error:</strong> Turbulence model inadequacy (hard to quantify)</li>
+<li><strong>Input uncertainty:</strong> Boundary conditions, geometry tolerances, material properties</li>
+</ul>
+</section>
+
+<section>
+<h2>Phase 5: Verification &amp; Validation (V&amp;V)</h2>
+
+<h3>Verification: "Are we solving the equations right?"</h3>
+<ul>
+<li><strong>Code verification:</strong> Method of manufactured solutions, order-of-accuracy tests (done by code developers)</li>
+<li><strong>Solution verification:</strong> Mesh convergence, iteration convergence, round-off checks (done by YOU for each simulation)</li>
+</ul>
+
+<h3>Validation: "Are we solving the right equations?"</h3>
+<ul>
+<li>Compare simulation results to <strong>independent experimental data</strong> for the same configuration</li>
+<li>Quantify the difference: is it within combined numerical + experimental uncertainty?</li>
+<li>If no experimental data exists → it's not validation, it's "calibration" or "faith"</li>
+</ul>
+
+<h3>The V&amp;V Hierarchy</h3>
+<ol>
+<li>Canonical cases (flat plate boundary layer, cylinder in crossflow, backward-facing step)</li>
+<li>Component-level experiments (airfoil, nozzle, diffuser)</li>
+<li>Full-system experiments (complete aircraft, engine, vehicle)</li>
+</ol>
+<p>Validate at the lowest level possible before trusting full-system predictions.</p>
+</section>
+
+<section>
+<h2>Common Pitfalls for Beginners</h2>
+<table>
+<thead>
+<tr><th>Pitfall</th><th>Symptom</th><th>Fix</th></tr>
+</thead>
+<tbody>
+<tr><td>Bad mesh near wall</td><td>Wrong skin friction, separation prediction</td><td>Check y⁺, add prism layers, mesh independence study</td></tr>
+<tr><td>Wrong turbulence model</td><td>Separation missing/predicted wrong, wrong pressure recovery</td><td>Try SST, compare models, check literature for similar flows</td></tr>
+<tr><td>Outlet too close</td><td>Backflow, pressure reflection, wrong forces</td><td>Extend domain, use pressure far-field</td></tr>
+<tr><td>Unsteady run as steady</td><td>Residuals oscillate, monitors don't converge</td><td>Switch to unsteady, or accept time-averaged unsteady</td></tr>
+<tr><td>No mesh independence</td><td>Result changes with mesh, no error estimate</td><td>Run 3+ meshes, plot QoI vs. 1/N</td></tr>
+<tr><td>Trusting color plots</td><td>Pretty pictures, wrong numbers</td><td>Always extract quantitative data, verify balances</td></tr>
+</tbody>
+</table>
+</section>
+
+<section>
+<h2>Your First CFD Project Checklist</h2>
+<p>Before considering a simulation "done":</p>
+<ul>
+<li>[ ] Problem defined with QoI and target accuracy</li>
+<li>[ ] Geometry cleaned, fluid volume extracted</li>
+<li>[ ] Mesh with boundary layers (y⁺ checked), quality metrics OK</li>
+<li>[ ] Mesh independence study completed (3+ meshes)</li>
+<li>[ ] Physics models justified for this flow regime</li>
+<li>[ ] Boundary conditions physically consistent, far enough</li>
+<li>[ ] Initialization reasonable, solver settings standard</li>
+<li>[ ] Residuals dropped 3+ orders, monitors flat, mass balance &lt;0.1%</li>
+<li>[ ] Quantitative results extracted (forces, profiles, integrals)</li>
+<li>[ ] Compared to experimental/analytical data if available</li>
+<li>[ ] Discretization error estimated (Richardson extrapolation)</li>
+<li>[ ] Limitations documented (model assumptions, input uncertainties)</li>
+</ul>
+</section>
+
+<section class="socratic-section">
+<h2>Check Your Understanding</h2>
+
+<div class="socratic" data-question="mesh-independence">
+<p><strong>Question 1:</strong> You run a simulation on three meshes: 1M, 4M, and 16M cells. The drag coefficient is 0.0321, 0.0308, and 0.0305 respectively. Estimate the "exact" (zero mesh size) drag coefficient using Richardson extrapolation assuming 2nd-order spatial accuracy. What is the estimated discretization error on the 4M mesh?</p>
+</div>
+
+<div class="socratic" data-question="boundary-condition">
+<p><strong>Question 2:</strong> A student sets up an external aerodynamics simulation (car at highway speed) with a velocity inlet 2 car-lengths upstream and a pressure outlet 3 car-lengths downstream. The residuals converge but the drag coefficient is 15% higher than wind-tunnel data. Name three specific things about the boundary conditions or domain size that could cause this discrepancy.</p>
+</div>
+
+<div class="socratic" data-question="verification-vs-validation">
+<p><strong>Question 3:</strong> Explain the difference between verification and validation in CFD. Your simulation of a new heat exchanger design shows a pressure drop of 850 Pa. The only experimental data available is for a similar (but not identical) heat exchanger at a different Reynolds number, showing 780 Pa. Is comparing your 850 Pa to their 780 Pa an act of verification or validation? What would you need to do to make it the other one?</p>
+</div>
+
+</section>
+</main>
+
+<footer>
+<p><a href="lesson4.html">← Previous: Solving the Discrete System</a> | <a href="index.html">Back to Home</a></p>
+</footer>
+<script src="socratic.js" defer></script>
+</body>
+</html>

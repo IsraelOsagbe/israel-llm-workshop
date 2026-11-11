@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 4: Solving the Discrete System — Computational Fluid Dynamics</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<h1>Lesson 4: Solving the Discrete System</h1>
+<p class="subtitle">Computational Fluid Dynamics — First Year Introduction</p>
+</header>
+
+<main>
+<nav class="breadcrumb">
+<a href="index.html">← Home</a> | <a href="lesson3.html">← Previous</a> | <a href="lesson5.html">Next: The CFD Workflow →</a>
+</nav>
+
+<section>
+<h2>From PDEs to Linear Systems</h2>
+<p>After discretization (Lesson 3), the continuous PDEs become a large system of nonlinear algebraic equations. For the steady incompressible Navier–Stokes on a mesh with <em>N</em> cells:</p>
+
+<ul>
+<li>Unknowns: <em>p</em> (N), <em>u</em>, <em>v</em>, <em>w</em> (3N) → 4N total</li>
+<li>Equations: Continuity (N) + Momentum x3 (3N) → 4N equations</li>
+</ul>
+
+<p>This is a <strong>sparse, nonlinear, coupled system</strong>. We solve it iteratively:</p>
+<ol>
+<li>Linearize the equations (Newton, Picard, or segregated approach)</li>
+<li>Solve the resulting linear system</li>
+<li>Update the solution</li>
+<li>Repeat until converged</li>
+</ol>
+</section>
+
+<section>
+<h2>Segregated vs. Coupled Solution</h2>
+
+<h3>Segregated (Pressure-Based) Solvers — Most Common</h3>
+<p>Solve momentum and continuity sequentially, iterating between them:</p>
+<ol>
+<li>Guess pressure field <em>p*</em></li>
+<li>Solve momentum equations for velocity <em>u*</em> using <em>p*</em></li>
+<li>Velocity <em>u*</em> won't satisfy continuity. Derive a <strong>pressure correction equation</strong> from continuity.</li>
+<li>Solve for pressure correction <em>p'</em>, correct pressure and velocity</li>
+<li>Repeat until mass and momentum residuals are small</li>
+</ol>
+
+<p>Famous algorithms: SIMPLE (Semi-Implicit Method for Pressure-Linked Equations), SIMPLEC, PISO. OpenFOAM uses PISO for transient, SIMPLE for steady.</p>
+
+<h3>Coupled (Density-Based) Solvers</h3>
+<p>Solve all equations simultaneously as one big system. Uses the compressible form with an equation of state. Natural for high-speed compressible flow (shocks, supersonics). Less robust at low Mach numbers due to stiffness.</p>
+</section>
+
+<section>
+<h2>Linear Solvers: The Inner Loop</h2>
+<p>Each segregated iteration requires solving linear systems like <em>Ax = b</em> where <em>A</em> is a large sparse matrix (millions of rows). Direct solvers (LU decomposition) are too expensive — we use <strong>iterative linear solvers</strong>.</p>
+
+<h3>Stationary Iterative Methods</h3>
+<ul>
+<li><strong>Gauss–Seidel / SOR:</strong> Update each unknown using latest neighbor values. Simple, slow convergence.</li>
+<li><strong>Jacobi:</strong> Use only old values. Parallelizable but slower.</li>
+</ul>
+
+<h3>Krylov Subspace Methods (The Standard)</h3>
+<ul>
+<li><strong>CG (Conjugate Gradient):</strong> For symmetric positive-definite matrices</li>
+<li><strong>GMRES (Generalized Minimal Residual):</strong> For general non-symmetric matrices</li>
+<li><strong>BiCGSTAB:</strong> Bi-conjugate gradient stabilized, less memory than GMRES</li>
+</ul>
+<p>These converge in at most <em>N</em> iterations (exact in exact arithmetic), but we stop early when residual is small enough.</p>
+
+<h3>Preconditioning — The Key to Fast Convergence</h3>
+<p>Krylov methods converge slowly for ill-conditioned matrices. A <strong>preconditioner</strong> <em>M ≈ A</em> transforms the system:</p>
+<pre><code>M⁻¹Ax = M⁻¹b</code></pre>
+<p>so the eigenvalues cluster near 1. Common preconditioners:</p>
+<ul>
+<li><strong>ILU(k):</strong> Incomplete LU factorization (drop small fill-ins)</li>
+<li><strong>Algebraic Multigrid (AMG):</strong> Solve on a hierarchy of coarser grids — <strong>the gold standard for CFD</strong></li>
+<li><strong>Block Jacobi / Additive Schwarz:</strong> Domain decomposition for parallelism</li>
+</ul>
+</section>
+
+<section>
+<h2>Multigrid: Why It Works</h2>
+<p>Standard iterative smoothers (Gauss–Seidel) quickly eliminate <strong>high-frequency errors</strong> (oscillatory on the grid) but struggle with <strong>low-frequency errors</strong> (smooth, long-wavelength).</p>
+
+<p>Multigrid fixes this by:</p>
+<ol>
+<li>Smoothing on the fine grid (kills high-frequency error)</li>
+<li>Restricting the residual to a coarser grid (low-frequency error becomes high-frequency there)</li>
+<li>Solving (or smoothing) on the coarse grid</li>
+<li>Prolongating the correction back to the fine grid</li>
+<li>Repeat recursively (V-cycle, W-cycle, F-cycle)</li>
+</ol>
+
+<p>This gives <strong>mesh-independent convergence</strong> — the number of iterations to reach a given tolerance stays constant as you refine the mesh. For CFD, geometric multigrid (structured) or algebraic multigrid (unstructured) is essential.</p>
+</section>
+
+<section>
+<h2>Turbulence Modeling: The Closure Problem</h2>
+<p>The Navier–Stokes equations are exact. But for turbulent flow, the smallest scales (Kolmogorov scale) are far too small to resolve on any practical mesh for engineering Reynolds numbers. We must <strong>model</strong> the effect of unresolved scales.</p>
+
+<h3>RANS (Reynolds-Averaged Navier–Stokes)</h3>
+<p>Decompose velocity: <em>u = ū + u'</em> (mean + fluctuation). Average the equations:</p>
+<pre><code>ρ(∂ū/∂t + ū·∇ū) = −∇p̄ + μ∇²ū − ∇·(ρ u'u') + ρg</code></pre>
+<p>The <strong>Reynolds stress tensor</strong> <em>−ρ u'u'</em> is unknown — the <strong>closure problem</strong>.</p>
+
+<p>Common models:</p>
+<ul>
+<li><strong>Eddy viscosity models:</strong> <em>−ρ u'u' = μ_t(∇ū + ∇ū^T) − (2/3)ρkI</em></li>
+<li><strong>k–ε (two-equation):</strong> Transport equations for turbulent kinetic energy <em>k</em> and dissipation <em>ε</em>. Robust, standard for industrial RANS.</li>
+<li><strong>k–ω SST:</strong> Blends k–ω near walls with k–ε in free stream. Better for adverse pressure gradients, separation. <strong>Industry default for aerodynamics.</strong></li>
+<li><strong>Reynolds Stress Models (RSM):</strong> Solve transport equations for each Reynolds stress component. More physics, more cost, less robust.</li>
+</ul>
+
+<h3>LES (Large Eddy Simulation)</h3>
+<p>Resolve large energy-containing eddies, model only the small subgrid scales. Much more accurate than RANS for unsteady flows, but 10–1000x more expensive. Requires fine mesh and time-accurate integration.</p>
+
+<h3>DNS (Direct Numerical Simulation)</h3>
+<p>Resolve all scales down to Kolmogorov. No modeling. Only for fundamental research at low Re (Re_τ ~ 1000 max on today's supercomputers).</p>
+</section>
+
+<section>
+<h2>Convergence: When Do You Stop?</h2>
+<p>Three criteria, all should be satisfied:</p>
+
+<ol>
+<li><strong>Residuals drop:</strong> Normalized residuals (mass, momentum, energy, turbulence) fall 3–4 orders of magnitude</li>
+<li><strong>Monitored quantities stabilize:</strong> Drag, lift, pressure drop, mass flow at outlets — stop changing</li>
+<li><strong>Global balances satisfied:</strong> Mass in = mass out (to machine precision), energy in = energy out</li>
+</ol>
+
+<p><strong>Warning:</strong> Low residuals ≠ converged solution. A solution can have flat residuals but wrong physics (e.g., wrong turbulence model, bad boundary conditions). Always check monitored quantities.</p>
+</section>
+
+<section class="socratic-section">
+<h2>Check Your Understanding</h2>
+
+<div class="socratic" data-question="simple-algorithm">
+<p><strong>Question 1:</strong> In the SIMPLE algorithm, the pressure correction equation is derived from the continuity equation. Sketch the steps: start from discrete momentum equation, express velocity correction in terms of pressure correction, substitute into discrete continuity. What is the resulting equation for p'?</p>
+</div>
+
+<div class="socratic" data-question="preconditioning">
+<p><strong>Question 2:</strong> Why does a plain GMRES solver (without preconditioning) converge very slowly for a typical CFD matrix from a fine mesh? What property of the matrix makes it ill-conditioned, and how does algebraic multigrid (AMG) address this?</p>
+</div>
+
+<div class="socratic" data-question="rans-vs-les">
+<p><strong>Question 3:</strong> You're simulating flow over a wind turbine blade at Re = 10⁷. The client wants time-accurate loads for fatigue analysis. Would you use RANS, LES, or DNS? Justify your choice considering accuracy, cost, and what each method can/cannot capture.</p>
+</div>
+
+</section>
+</main>
+
+<footer>
+<p><a href="lesson3.html">← Previous: From Continuous to Discrete</a> | <a href="index.html">Home</a> | <a href="lesson5.html">Next: The CFD Workflow →</a></p>
+</footer>
+<script src="socratic.js" defer></script>
+</body>
+</html>

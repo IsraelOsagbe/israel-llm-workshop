@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Module 8: High-Performance Implementation — CFD Course</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<h1>Module 8: High-Performance Implementation</h1>
+<p class="subtitle">Data Layout, MPI/OpenMP/GPU, Load Balancing, I/O, Reproducible Workflows</p>
+</header>
+
+<main>
+<nav class="breadcrumb">
+<a href="index.html">← Course Home</a> | <a href="module7.html">← Previous</a>
+</nav>
+
+<section>
+<h2>8.1 Data Layout &amp; Memory Access Patterns</h2>
+<p>CFD performance is <strong>memory-bandwidth bound</strong>. Data layout determines cache utilization, vectorization, and parallel scalability.</p>
+
+<h3>Array of Structures (AoS) vs. Structure of Arrays (SoA)</h3>
+<div class="equation-box">
+// AoS: Poor vectorization, cache pollution
+struct Cell { double rho, rhou, rhov, rhow, rhoE; };
+Cell cells[N];
+
+// SoA: Contiguous, vectorizable, cache-friendly
+double *rho = new double[N];
+double *rhou = new double[N];
+double *rhov = new double[N];
+double *rhow = new double[N];
+double *rhoE = new double[N];
+</div>
+<p><strong>SoA is mandatory for SIMD/GPU</strong>. Use <em>AoSoA</em> (tiles of SoA) for L1 cache blocking: <em>CellChunk { double rho[64], rhou[64], ... }</em>.</p>
+
+<h3>Mesh Data Structures</h3>
+<ul>
+<li><strong>Cell-centered:</strong> Cell arrays + face connectivity (cell-cell, cell-face)</li>
+<li><strong>Face-centered:</strong> Face arrays + cell-face incidence</li>
+<li><strong>Edge-based:</strong> Edge arrays for vertex-centered schemes</li>
+</ul>
+<p>Store <strong>geometric data</strong> (volume, face area, normal, centroid, neighbor indices) in SoA. Precompute and store <em>1/volume, face_area/volume</em> to avoid division in hot loops.</p>
+
+<h3>Ghost/Halo Layers</h3>
+<p>For distributed memory, each partition needs ghost cells from neighbors. <strong>Ghost depth = stencil radius</strong> (1 for 2nd-order FV, <em>k</em> for <em>k</em>-th order). Pack/unpack using MPI derived datatypes for non-contiguous data.</p>
+</section>
+
+<section>
+<h2>8.2 MPI Parallelization</h2>
+
+<h3>Domain Decomposition</h3>
+<ul>
+<li><strong>Partitioning:</strong> ParMETIS, PT-Scotch, Zoltan — minimize edge cut, balance cell count</li>
+<li><strong>Load imbalance metric:</strong> <em>max_cells / avg_cells</em> — target < 1.05</li>
+<li><strong>Communication volume:</strong> <em>∑ ghost_faces / ∑ owned_faces</em> — minimize surface-to-volume ratio</li>
+</ul>
+
+<h3>Communication Patterns</h3>
+<table>
+<thead>
+<tr><th>Operation</th><th>Pattern</th><th>Optimization</th></tr>
+</thead>
+<tbody>
+<tr><td>SpMV / Flux computation</td><td>Nearest-neighbor (halo exchange)</td><td>Overlap comm/compute: MPI_Isend/Irecv + compute interior</td></tr>
+<tr><td>Global reduction (dot, norm)</td><td>MPI_Allreduce</td><td>Use MPI_Reduce + broadcast for non-blocking; persistent collectives</td></tr>
+<tr><td>Multigrid coarse solve</td><td>All-to-one or recursive halving</td><td>Agglomeration to fewer MPI ranks on coarse levels</td></tr>
+<tr><td>I/O</td><td>Collective MPI-IO</td><td>HDF5/ADIOS2 with collective buffering</td></tr>
+</tbody>
+</table>
+
+<h3>Overlapping Communication &amp; Computation</h3>
+<div class="equation-box">
+// 1. Post non-blocking receives for ghost data
+MPI_Irecv(ghost_recv_buf, count, MPI_DOUBLE, src, tag, comm, &req[i]);
+
+// 2. Post non-blocking sends
+MPI_Isend(ghost_send_buf, count, MPI_DOUBLE, dst, tag, comm, &req[i]);
+
+// 3. Compute interior cells (no ghost data needed)
+compute_interior();
+
+// 4. Wait for communication to complete
+MPI_Waitall(nreq, req, MPI_STATUSES_IGNORE);
+
+// 5. Compute boundary/ghost cells
+compute_boundary();
+</div>
+<p>This hides latency; effectiveness depends on <strong>surface-to-volume ratio</strong> of partition.</p>
+</section>
+
+<section>
+<h2>8.3 Thread Parallelization (OpenMP, TBB, std::thread)</h2>
+
+<h3>Loop-Level Parallelism</h3>
+<p>Parallelize over cells/faces/edges:</p>
+<div class="equation-box">
+#pragma omp parallel for schedule(static)
+for (int i = 0; i < n_cells; i++) {
+    compute_residual(i);
+}
+</div>
+<p><strong>static</strong> scheduling for uniform work; <strong>guided</strong> or <strong>dynamic</strong> for load imbalance (e.g., adaptive mesh, chemistry).</p>
+
+<h3>Thread-Safe Data Structures</h3>
+<ul>
+<li><strong>Reductions:</strong> <em>#pragma omp reduction(+:sum)</em></li>
+<li><strong>Atomic updates:</strong> For assembly into shared arrays (e.g., Jacobian)</li>
+<li><strong>Thread-local storage:</strong> Accumulate per-thread, reduce at end</li>
+</ul>
+
+<h3>MPI+OpenMP Hybrid</h3>
+<p>Typical: 1 MPI rank per NUMA domain / socket, OpenMP threads per core. Reduces MPI communication volume, improves memory locality. Set <em>OMP_PROC_BIND=spread</em>, <em>OMP_PLACES=cores</em>.</p>
+</section>
+
+<section>
+<h2>8.4 GPU Acceleration</h2>
+
+<h3>GPU Programming Models</h3>
+<table>
+<thead>
+<tr><th>Model</th><th>Language</th><th>Portability</th><th>Control</th></tr>
+</thead>
+<tbody>
+<tr><td>CUDA</td><td>C++</td><td>NVIDIA only</td><td>Maximum</td></tr>
+<tr><td>HIP</td><td>C++</td><td>AMD + NVIDIA</td><td>High</td></tr>
+<tr><td>OpenMP target</td><td>C++/Fortran</td><td>All vendors</td><td>Medium</td></tr>
+<tr><td>SYCL / oneAPI</td><td>C++</td><td>Intel, NVIDIA, AMD</td><td>High</td></tr>
+<tr><td>Kokkos / RAJA</td><td>C++</td><td>All (backends)</td><td>Abstraction layer</td></tr>
+</tbody>
+</table>
+
+<h3>Key Kernels to Port</h3>
+<ol>
+<li><strong>Residual computation (SpMV-like):</strong> Flux loops over faces/cells — memory bound</li>
+<li><strong>Reconstruction (least-squares):</strong> Small dense linear algebra per cell — compute bound</li>
+<li><strong>Linear solver (SpMV, dot, AXPY):</strong> Krylov methods — memory bound</li>
+<li><strong>Time integration stages:</strong> Vector updates — memory bound</li>
+</ol>
+
+<h3>Data Layout for GPU</h3>
+<ul>
+<li><strong>SoA is essential</strong> — coalesced global memory access</li>
+<li><strong>Structure of Arrays of Structures (SoAoS):</strong> Tile of 32–128 cells per warp for shared memory</li>
+<li><strong>Avoid indirect addressing</strong> in hot loops — use compact neighbor lists or CSR with uniform stride</li>
+<li><strong>Unified Memory (CUDA) / USM (SYCL):</strong> Simplifies memory management; prefer explicit for performance</li>
+</ul>
+
+<h3>Preconditioners on GPU</h3>
+<ul>
+<li><strong>Block Jacobi:</strong> Trivial — invert small dense blocks per cell in parallel</li>
+<li><strong>ILU(0):</strong> Hard — sequential dependencies; use <strong>level-scheduling</strong> or <strong>parallel ILU</strong> (e.g., PARILU, cuSPARSE)</li>
+<li><strong>AMG:</strong> Very hard — use <strong>AMGX</strong> (NVIDIA), <strong>hypre GPU</strong>, or <strong>Alpaka/RAJA AMG</strong></li>
+<li><strong>Chebyshev / Polynomial preconditioners:</strong> Matrix-free, parallel — good alternative</li>
+</ul>
+</section>
+
+<section>
+<h2>8.5 Load Balancing for Adaptive &amp; Multiphysics</h2>
+
+<h3>Dynamic Load Balancing</h3>
+<p>For AMR, moving meshes, or chemistry: work per cell varies. Strategies:</p>
+<ul>
+<li><strong>Space-filling curves (SFC):</strong> Hilbert/Z-order — fast repartitioning, good locality</li>
+<li><strong>Diffusive load balancing:</strong> Iteratively migrate work to neighbors — low migration cost</li>
+<li><strong>ParMETIS repartitioning:</strong> Global repartition — high quality, expensive (do infrequently)</li>
+</ul>
+
+<h3>Multiphysics Coupling</h3>
+<p>Fluid-structure interaction, conjugate heat transfer, electrochemistry:</p>
+<ul>
+<li><strong>Monolithic:</strong> Single mesh, coupled Jacobian — best convergence, complex implementation</li>
+<li><strong>Partitioned (staggered):</strong> Separate solvers, data exchange at interface — modular, needs coupling iterations</li>
+<li><strong>Load balancing:</strong> Assign work based on <strong>compute cost per cell</strong> (fluid vs. solid vs. chemistry)</li>
+</ul>
+</section>
+
+<section>
+<h2>8.6 High-Performance I/O</h2>
+
+<h3>I/O Patterns</h3>
+<table>
+<thead>
+<tr><th>Pattern</th><th>Use Case</th><th>Library</th></tr>
+</thead>
+<tbody>
+<tr><td>Checkpoint/Restart</td><td>Fault tolerance, long runs</td><td>HDF5, ADIOS2, SIONlib</td></tr>
+<tr><td>Time-series output</td><td>Post-processing, visualization</td><td>HDF5 (chunked), ADIOS2 BP</td></tr>
+<tr><td>In situ analysis</td><td>Reduce data volume</td><td>Catalyst, Ascent, libsim</td></tr>
+<tr><td>Mesh I/O</td><td>Pre/post processing</td><td>CGNS, Gmsh, VTK</td></tr>
+</tbody>
+</table>
+
+<h3>Best Practices</h3>
+<ul>
+<li><strong>Collective MPI-IO:</strong> All ranks participate; enables file system striping</li>
+<li><strong>Chunked datasets:</strong> HDF5 chunks aligned with access pattern (time slices, spatial blocks)</li>
+<li><strong>Compression:</strong> ZFP (floating-point), SZ, Blosc — 2–10× reduction, fast</li>
+<li><strong>Asynchronous I/O:</strong> ADIOS2 engines (BP5, SST) — overlap I/O with computation</li>
+<li><strong>In situ:</strong> Extract QoI, render images, compute statistics <strong>during simulation</strong> — avoid writing full 3D fields</li>
+</ul>
+</section>
+
+<section>
+<h2>8.7 Performance Analysis &amp; Optimization</h2>
+
+<h3>Roofline Model</h3>
+<p>Plot <strong>achieved FLOP/s</strong> vs. <strong>arithmetic intensity (FLOP/byte)</strong>. Ceiling: peak compute (CPU/GPU) and memory bandwidth.</p>
+<ul>
+<li>Most CFD kernels: <strong>memory-bound</strong> (AI < 1 FLOP/byte)</li>
+<li>Optimization target: increase AI via <strong>fusion</strong>, <strong>tiling</strong>, <strong>recomputation</strong></li>
+</ul>
+
+<h3>Profiling Tools</h3>
+<ul>
+<li><strong>CPU:</strong> perf, VTune, PAPI, HPCToolkit, TAU, ARM MAP</li>
+<li><strong>GPU:</strong> Nsight Compute, Nsight Systems, rocprof, CUPTI</li>
+<li><strong>MPI:</strong> MPIP, Intel MPI Trace Analyzer, Vampir, Scalasca</li>
+<li><strong>Hardware counters:</strong> L1/L2/L3 miss rate, memory bandwidth, occupancy, SM throughput</li>
+</ul>
+
+<h3>Common Optimization Patterns</h3>
+<table>
+<thead>
+<tr><th>Pattern</th><th>Before</th><th>After</th></tr>
+</thead>
+<tbody>
+<tr><td>Loop fusion</td><td>3 separate loops over cells</td><td>1 fused loop: 3× less memory traffic</td></tr>
+<tr><td>Scalar replacement</td><td>Array accesses in inner loop</td><td>Register variables, reduce L1 pressure</td></tr>
+<tr><td>Vectorization</td><td>Scalar code, branches</td><td>Explicit SIMD (AVX-512), no branches</td></tr>
+<tr><td>Precomputation</td><td>1/vol, area/vol in hot loop</td><td>Store in geometric arrays</td></tr>
+<tr><td>Kernel fusion (GPU)</td><td>Launch 5 kernels</td><td>1 fused kernel, shared memory reuse</td></tr>
+</tbody>
+</table>
+</section>
+
+<section>
+<h2>8.8 Reproducible Computational Workflows</h2>
+
+<h3>Build Systems &amp; Dependency Management</h3>
+<ul>
+<li><strong>CMake + CTest + CDash:</strong> Standard for C++/Fortran HPC</li>
+<li><strong>Spack:</strong> Package manager for HPC — builds dependencies (MPI, HDF5, hypre, etc.) reproducibly</li>
+<li><strong>Containers:</strong> Apptainer/Singularity (HPC-friendly), Docker (dev) — capture full environment</li>
+</ul>
+
+<h3>Version Control for Code &amp; Data</h3>
+<ul>
+<li><strong>Code:</strong> Git — semantic versioning, signed commits</li>
+<li><strong>Large data:</strong> Git-LFS, DVC, or object storage (S3, iRODS) with checksums</li>
+<li><strong>Mesh/Input decks:</strong> Version with code (small) or DVC (large)</li>
+</ul>
+
+<h3>Continuous Integration for HPC</h3>
+<ul>
+<li>Compile test on target architectures (CPU, GPU)</li>
+<li>Unit tests (GoogleTest, Catch2) for math kernels</li>
+<li>Regression tests: run small cases, compare QoI to reference (tolerance-based)</li>
+<li>Performance tests: track FLOP/s, memory bandwidth, time-to-solution</li>
+</ul>
+
+<h3>Provenance &amp; Reproducibility</h3>
+<p>Every simulation result must record:</p>
+<ul>
+<li>Git commit hash (code version)</li>
+<li>Input deck (parameters, mesh)</li>
+<li>Container hash / Spack spec (environment)</li>
+<li>Hardware (node type, GPU model)</li>
+<li>MPI/OpenMP/GPU configuration (ranks, threads, affinity)</li>
+<li>Random seeds (for stochastic methods)</li>
+</ul>
+<p>Tools: <strong>ReproZip, Sumatra, MLflow, Sacred</strong> for experiment tracking.</p>
+</section>
+
+<section>
+<h2>8.9 Scaling to Leadership-Class Systems</h2>
+
+<h3>Strong vs. Weak Scaling</h3>
+<ul>
+<li><strong>Strong scaling:</strong> Fixed problem, more cores — target: <em>T(P) ≈ T(1)/P</em>. Limited by communication overhead, Amdahl's law.</li>
+<li><strong>Weak scaling:</strong> Fixed problem <em>per core</em>, more cores — target: <em>T(P) ≈ constant</em>. Limited by global reductions, I/O, load imbalance.</li>
+</ul>
+
+<h3>Exascale Challenges</h3>
+<ul>
+<li><strong>Resilience:</strong> MTBF ~ hours at 1M+ cores — checkpoint/restart, algorithm-based fault tolerance (ABFT)</li>
+<li><strong>Energy:</strong> Performance per watt — lower precision (FP16/BF16), near-data processing</li>
+<li><strong>Heterogeneity:</strong> CPU + GPU + accelerator — portable programming models (Kokkos, RAJA, SYCL)</li>
+<li><strong>Memory hierarchy:</strong> HBM, DDR, CXL, NVRAM — data placement, tiered memory</li>
+</ul>
+
+<h3>CFD-Specific Exascale Efforts</h3>
+<ul>
+<li><strong>ExaWind (NREL):</strong> Wind farm simulation, AMReX-based</li>
+<li><strong>CEED / NekRS:</strong> High-order spectral elements, GPU-native</li>
+<li><strong>AMReX / BoxLib:</strong> Block-structured AMR, GPU-ready</li>
+<li><strong>MFEM / libParanumal:</strong> High-order FEM, GPU</li>
+<li><strong>OpenFOAM GPU / CFD-GPU:</strong> Finite volume on GPU</li>
+</ul>
+</section>
+
+<section>
+<h2>8.10 Capstone: Mini-CFD Solver Architecture</h2>
+<p>A modern, performant CFD solver structure:</p>
+
+<div class="equation-box">
+src/
+├── core/           # Mesh, fields, parallelism, timer, logging
+│   ├── mesh.{h,cpp}       # Unstructured mesh, partitioning, ghost exchange
+│   ├── field.{h,cpp}      # SoA field data, halo exchange, reduction
+│   ├── parallel.{h,cpp}   # MPI + OpenMP + GPU abstraction
+│   └── timer.{h,cpp}      # Scoped timers, hardware counters
+├── physics/        # Equations, models, boundary conditions
+│   ├── euler.{h,cpp}      # Inviscid fluxes, Riemann solvers
+│   ├── navier_stokes.{h,cpp}  # Viscous fluxes, turbulence models
+│   ├── reconstruction.{h,cpp} # WENO, LSQ, limiters
+│   └── boundary.{h,cpp}   # BC types, characteristic BCs
+├── numerics/       # Time integration, linear solvers
+│   ├── time_integrator.{h,cpp}  # RK, IMEX, BDF, dual-time
+│   ├── linear_solver.{h,cpp}    # Krylov, preconditioners, AMG interface
+│   └── newton.{h,cpp}           # Newton-Krylov, JFNK, globalization
+├── io/             # Checkpoint, output, in situ
+│   ├── checkpoint.{h,cpp}   # HDF5/ADIOS2, async
+│   └── output.{h,cpp}       # VTK, Tecplot, in situ (Catalyst)
+├── driver/         # Main, parameter parsing, workflow
+│   ├── main.cpp
+│   ├── parameters.{h,cpp}   # JSON/YAML input, validation
+│   └── workflow.{h,cpp}     # V&V, UQ, optimization drivers
+└── test/           # Unit, regression, performance tests
+    ├── unit/
+    ├── regression/
+    └── performance/
+</div>
+
+<h3>Key Design Principles</h3>
+<ol>
+<li><strong>Separation of concerns:</strong> Physics independent of parallelism, discretization, hardware</li>
+<li><strong>Abstraction without overhead:</strong> Templates/policies for backend (CPU/GPU), zero-cost at compile time</li>
+<li><strong>Testability:</strong> Every kernel unit-testable; manufactured solutions in CI</li>
+<li><strong>Extensibility:</strong> New equations, models, BCs without rewriting core</li>
+<li><strong>Reproducibility:</strong> Provenance tracking built into driver</li>
+</ol>
+</section>
+
+<section class="socratic-section">
+<h2>Socratic Questions</h2>
+
+<div class="socratic" data-question="memory-layout">
+<p><strong>Question 1:</strong> For a 3D unstructured FV solver with 5 conserved variables per cell, compare the memory bandwidth requirements (bytes/FLOP) for AoS vs. SoA layout when computing the inviscid flux over all faces. Assume each face flux reads 5 variables from each of 2 cells, performs ~100 FLOP, and writes 5 fluxes. Which layout achieves higher fraction of peak bandwidth on a GPU with 1.5 TB/s memory bandwidth?</p>
+</div>
+
+<div class="socratic" data-question="mpi-overlap">
+<p><strong>Question 2:</strong> In a 3D MPI+OpenMP hybrid solver with 64K cells per rank, the halo exchange communicates 8K doubles. The interior computation takes 2 ms, the boundary computation takes 0.5 ms, and the MPI latency + bandwidth cost is 0.8 ms. If you overlap communication with interior computation, what is the total step time? What fraction of the communication is hidden? How does this change if the interior work drops to 0.6 ms (e.g., at scale)?</p>
+</div>
+
+<div class="socratic" data-question="gpu-kernel">
+<p><strong>Question 3:</strong> You are porting the least-squares gradient reconstruction kernel to GPU. Each cell gathers data from ~20 neighbors, forms a 5×20 matrix, computes QR factorization, and solves for the gradient. Analyze the challenges: (a) irregular memory access, (b) small dense linear algebra, (c) divergent control flow. Propose a strategy using <strong>warp-level primitives</strong> and <strong>shared memory</strong> to achieve >50% occupancy.</p>
+</div>
+
+<div class="socratic" data-question="load-balancing">
+<p><strong>Question 4:</strong> In an adaptive mesh refinement (AMR) simulation with 4 refinement levels, the finest level has 10× more cells than the coarsest. The work per cell is proportional to the level (due to smaller time steps). Design a <strong>space-filling curve (SFC)</strong> based load balancing algorithm. How do you weight the SFC keys to account for variable work per cell? What is the migration cost vs. ParMETIS repartitioning?</p>
+</div>
+
+<div class="socratic" data-question="reproducibility">
+<p><strong>Question 5:</strong> You run a production simulation on 1024 GPUs for 48 hours. The result is a drag coefficient <em>C_d = 0.02341</em>. Six months later, you need to reproduce it exactly. List the <strong>minimum set of metadata</strong> you must have archived. If the original GPU model (A100) is no longer available and you must run on H100, what aspects of the result might change despite identical code and inputs? How would you quantify this?</p>
+</div>
+
+</section>
+</main>
+
+<footer>
+<p><a href="module7.html">← Module 7: Verification, Validation &amp; UQ</a> | <a href="index.html">Course Home</a></p>
+</footer>
+<script src="socratic.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 2: The Governing Equations — Computational Fluid Dynamics</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<h1>Lesson 2: The Governing Equations</h1>
+<p class="subtitle">Computational Fluid Dynamics — First Year Introduction</p>
+</header>
+
+<main>
+<nav class="breadcrumb">
+<a href="index.html">← Home</a> | <a href="lesson1.html">← Previous</a> | <a href="lesson3.html">Next: From Continuous to Discrete →</a>
+</nav>
+
+<section>
+<h2>Conservation Laws: The Foundation</h2>
+<p>Fluid dynamics rests on three fundamental conservation principles, applied to a <strong>control volume</strong> (a fixed region in space) or a <strong>material volume</strong> (a moving blob of fluid):</p>
+
+<ol>
+<li><strong>Mass conservation</strong> — Matter cannot be created or destroyed</li>
+<li><strong>Momentum conservation</strong> — Newton's second law for a fluid element</li>
+<li><strong>Energy conservation</strong> — First law of thermodynamics for a fluid element</li>
+</ol>
+
+<p>Each gives a partial differential equation (PDE). Together they form a closed system describing the fluid state: velocity <strong>u</strong> = (u, v, w), pressure <em>p</em>, density <em>ρ</em>, temperature <em>T</em>, and internal energy <em>e</em>.</p>
+</section>
+
+<section>
+<h2>Mass Conservation (Continuity Equation)</h2>
+<p>For a control volume, the rate of mass increase inside equals the net mass flux through its boundary:</p>
+<pre><code>∂ρ/∂t + ∇·(ρu) = 0</code></pre>
+<p>In Cartesian coordinates:</p>
+<pre><code>∂ρ/∂t + ∂(ρu)/∂x + ∂(ρv)/∂y + ∂(ρw)/∂z = 0</code></pre>
+
+<p><strong>Incompressible flow</strong> (constant density, e.g., water, low-speed air):</p>
+<pre><code>∇·u = 0  →  ∂u/∂x + ∂v/∂y + ∂w/∂z = 0</code></pre>
+<p>This is a <strong>kinematic constraint</strong> — the velocity field must be divergence-free. It couples the velocity components without involving pressure directly.</p>
+</section>
+
+<section>
+<h2>Momentum Conservation (Navier–Stokes Equations)</h2>
+<p>Newton's second law: rate of momentum change = sum of forces. Forces on a fluid element are:</p>
+<ul>
+<li><strong>Pressure forces</strong> — normal stress, <em>−∇p</em></li>
+<li><strong>Viscous forces</strong> — shear stress, <em>∇·τ</em> where <em>τ</em> is the viscous stress tensor</li>
+<li><strong>Body forces</strong> — gravity, electromagnetic, etc., <em>ρg</em></li>
+</ul>
+
+<p>For a Newtonian fluid (linear stress–strain rate relation):</p>
+<pre><code>ρ(∂u/∂t + u·∇u) = −∇p + μ∇²u + (μ/3 + λ)∇(∇·u) + ρg</code></pre>
+<p>where <em>μ</em> is dynamic viscosity and <em>λ</em> is bulk viscosity.</p>
+
+<p><strong>Incompressible, constant-μ Navier–Stokes:</strong></p>
+<pre><code>ρ(∂u/∂t + u·∇u) = −∇p + μ∇²u + ρg
+∇·u = 0</code></pre>
+
+<p>The term <em>u·∇u</em> is the <strong>convective acceleration</strong> — it makes the equations nonlinear and is the source of turbulence.</p>
+</section>
+
+<section>
+<h2>Energy Conservation</h2>
+<p>For compressible flow, temperature/density changes matter. The energy equation (first law) in terms of temperature:</p>
+<pre><code>ρc_p(∂T/∂t + u·∇T) = ∇·(k∇T) + Φ + Q̇</code></pre>
+<p>where <em>c_p</em> is specific heat, <em>k</em> is thermal conductivity, <em>Φ</em> is viscous dissipation, and <em>Q̇</em> is heat sources.</p>
+
+<p><strong>For incompressible flow with constant properties</strong>, the energy equation <strong>decouples</strong> from momentum — you solve momentum first, then plug the velocity field into the energy equation. This is why many introductory CFD courses focus on isothermal incompressible flow.</p>
+</section>
+
+<section>
+<h2>Equation of State</h2>
+<p>To close the system, we need a relation between <em>ρ</em>, <em>p</em>, and <em>T</em>. For ideal gases:</p>
+<pre><code>p = ρRT</code></pre>
+<p>For liquids, density is often treated as constant (incompressible) or a weak function of pressure/temperature.</p>
+</section>
+
+<section>
+<h2>Compressible vs. Incompressible Flow: Channel Example</h2>
+<p>The distinction between compressible and incompressible flow fundamentally changes the governing equations, numerical methods, and physical phenomena. The key parameter is the <strong>Mach number</strong> <em>Ma = U/c</em> (flow speed / speed of sound). Generally, <em>Ma &lt; 0.3</em> → incompressible; <em>Ma &gt; 0.3</em> → compressible effects matter.</p>
+<p><a href="fanno-flow.html" class="btn-inline">🔬 Interactive Fanno Flow Solver →</a> Solve the compressible channel example with live plots and contours.</p>
+
+<table>
+<thead>
+<tr><th>Aspect</th><th>Incompressible Flow</th><th>Compressible Flow</th></tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Density</strong></td>
+<td>Constant (ρ = ρ₀), or function of <em>T</em> only</td>
+<td>Variable, coupled to <em>p</em> and <em>T</em> via equation of state</td>
+</tr>
+<tr>
+<td><strong>Continuity equation</strong></td>
+<td>∇·u = 0 (kinematic constraint)</td>
+<td>∂ρ/∂t + ∇·(ρu) = 0 (transport equation for ρ)</td>
+</tr>
+<tr>
+<td><strong>Pressure role</strong></td>
+<td>Lagrange multiplier enforcing ∇·u = 0; no thermodynamic meaning</td>
+<td>Thermodynamic variable; related to ρ, T via <em>p = ρRT</em></td>
+</tr>
+<tr>
+<td><strong>Energy equation</strong></td>
+<td>Decoupled from momentum (solve sequentially)</td>
+<td>Fully coupled — temperature affects density, pressure, viscosity</td>
+</tr>
+<tr>
+<td><strong>Speed of sound</strong></td>
+<td>Infinite (pressure waves propagate instantly)</td>
+<td>Finite; acoustic waves, shocks, expansion fans possible</td>
+</tr>
+<tr>
+<td><strong>Mach number regime</strong></td>
+<td>Ma &lt; 0.3 (low-speed air, liquids)</td>
+<td>Ma ≥ 0.3 (high-speed air, gas pipelines, nozzles)</td>
+</tr>
+<tr>
+<td><strong>Typical solver</strong></td>
+<td>Pressure-based (SIMPLE, PISO)</td>
+<td>Density-based (coupled, Riemann solvers)</td>
+</tr>
+<tr>
+<td><strong>Channel flow example</strong></td>
+<td>Water at 2 m/s in a 5 cm pipe (Re ≈ 10⁵, Ma ≈ 0.001)</td>
+<td>Air at 300 m/s in a 5 cm pipe (Re ≈ 10⁶, Ma ≈ 0.9)</td>
+</tr>
+<tr>
+<td><strong>Channel pressure drop</strong></td>
+<td>Δp from friction only; density unchanged</td>
+<td>Δp from friction + acceleration (density drops as p drops); choking possible</td>
+</tr>
+<tr>
+<td><strong>Channel velocity profile</strong></td>
+<td>Parabolic (laminar) or log-law (turbulent); same shape along pipe</td>
+<td>Profile changes along pipe — accelerates as density decreases</td>
+</tr>
+<tr>
+<td><strong>Outlet boundary condition</strong></td>
+<td>Fixed pressure or outflow</td>
+<td>Must handle subsonic/supersonic characteristics; non-reflecting BCs</td>
+</tr>
+</tbody>
+</table>
+
+<h3>Channel Flow Example: Incompressible (Water)</h3>
+<p>Water at 20°C, ρ ≈ 998 kg/m³, μ ≈ 1.0×10⁻³ Pa·s, flowing at <em>U</em> = 2 m/s in a circular pipe of diameter <em>D</em> = 0.05 m.</p>
+<ul>
+<li>Re = ρUD/μ ≈ 99,800 (turbulent)</li>
+<li>Ma = U/c ≈ 2/1480 ≈ 0.0013 ≪ 0.3 → incompressible</li>
+<li>Pressure drop from Darcy–Weisbach: Δp = f(L/D)(ρU²/2)</li>
+<li>Density, temperature essentially constant along pipe</li>
+<li>Velocity profile fully developed, unchanged downstream</li>
+</ul>
+
+<h3>Channel Flow Example: Compressible (Air)</h3>
+<p>Air at 300 K, 100 kPa, ρ ≈ 1.16 kg/m³, μ ≈ 1.85×10⁻⁵ Pa·s, c ≈ 347 m/s, flowing at <em>U</em> = 300 m/s in same pipe.</p>
+<ul>
+<li>Re = ρUD/μ ≈ 940,000 (turbulent)</li>
+<li>Ma = U/c ≈ 0.86 → compressible, transonic</li>
+<li>Fanno flow analysis: friction causes Mach number to approach 1 (choking)</li>
+<li>Density decreases significantly along pipe (ρ ∝ 1/√(1 + fL/D))</li>
+<li>Velocity increases along pipe to maintain mass flow ρU = constant</li>
+<li>Temperature drops due to adiabatic expansion</li>
+<li>If pipe is long enough, flow chokes at Ma = 1 — maximum mass flow reached</li>
+</ul>
+</section>
+
+<section>
+<h2>Boundary Conditions: The Other Half of the Problem</h2>
+<p>The PDEs need boundary conditions (BCs) to have a unique solution. Common types:</p>
+
+<table>
+<thead>
+<tr><th>Type</th><th>Physical Meaning</th><th>Typical Use</th></tr>
+</thead>
+<tbody>
+<tr><td>Dirichlet (fixed value)</td><td>u = u_wall, T = T_wall</td><td>No-slip wall, fixed temperature</td></tr>
+<tr><td>Neumann (fixed gradient)</td><td>∂u/∂n = 0, ∂T/∂n = q/k</td><td>Symmetry plane, prescribed heat flux</td></tr>
+<tr><td>Robin (mixed)</td><td>αu + β∂u/∂n = γ</td><td>Convective heat transfer, slip walls</td></tr>
+<tr><td>Periodic</td><td>u(x) = u(x+L)</td><td>Repeating geometries, DNS of homogeneous turbulence</td></tr>
+</tbody>
+</table>
+
+<p><strong>Inlet/Outlet BCs</strong> deserve special care — poorly posed outlet conditions reflect waves back into the domain and corrupt the solution.</p>
+</section>
+
+<section class="socratic-section">
+<h2>Check Your Understanding</h2>
+
+<div class="socratic" data-question="incompressible-continuity">
+<p><strong>Question 1:</strong> The incompressible continuity equation ∇·u = 0 contains no pressure. How does pressure get determined in an incompressible flow simulation? (Hint: think about what the momentum equation provides.)</p>
+</div>
+
+<div class="socratic" data-question="convective-term">
+<p><strong>Question 2:</strong> The term u·∇u is called "convective acceleration." Write it out in 2D Cartesian coordinates. Why does this term make the Navier–Stokes equations nonlinear? What would the equations look like without it?</p>
+</div>
+
+<div class="socratic" data-question="boundary-layers">
+<p><strong>Question 3:</strong> At a solid wall, the no-slip condition says u = 0. But the Navier–Stokes equations are second-order in space — they need two boundary conditions per velocity component. What is the second condition at a wall, and where does it come from physically?</p>
+</div>
+
+</section>
+</main>
+
+<footer>
+<p><a href="lesson1.html">← Previous: What Is CFD?</a> | <a href="index.html">Home</a> | <a href="lesson3.html">Next: From Continuous to Discrete →</a></p>
+</footer>
+<script src="socratic.js" defer></script>
+</body>
+</html>

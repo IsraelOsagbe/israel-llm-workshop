@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hypothesis & Research Gap - Tavares Breakage Model for Proppants</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Hypotheses Tested & Research Gap</h1>
+        <p class="subtitle">Why the Tavares model parameters don't transfer to proppants — and what to do about it</p>
+    </header>
+
+    <nav>
+        <a href="index.html">Overview & Parameters</a>
+        <a href="hypothesis.html" class="active">Hypothesis & Research Gap</a>
+    </nav>
+
+    <main>
+        <section id="hypotheses">
+            <h2>Six Hypotheses Tested and Rejected</h2>
+            
+            <article class="hypothesis rejected">
+                <h3>H1: Limestone parameters work for CarboAir/CarboLite ceramics</h3>
+                <p class="status">❌ REJECTED</p>
+                <p><strong>Reason:</strong> Limestone (E∞=7 J/kg) is a weak sedimentary rock failing by cleavage along bedding planes. CarboAir (ultra-low-density ceramic, SG=2.0) and CarboLite (low-density ceramic, SG=2.71) are engineered ceramics failing by transgranular fracture. Different Weibull modulus, different fracture mechanics.</p>
+                <p><strong>But:</strong> No alternative exists in literature. Limestone values used as lower-bound placeholder with explicit assumption flag.</p>
+            </article>
+
+            <article class="hypothesis rejected">
+                <h3>H2: Copper ore parameters work for quartz sand</h3>
+                <p class="status">❌ REJECTED</p>
+                <p><strong>Reason:</strong> Copper ore (E∞=213.5 J/kg) is a high-strength crystalline material. Quartz frac sand has characteristic strength ~180 MPa (Man & Wong, 2017) vs. copper ore's much higher strength. Size-effect exponent φ=1.22 for copper ore vs. unknown for sand.</p>
+                <p><strong>But:</strong> No published Tavares parameters exist for frac sand. Copper ore values serve as upper-bound placeholder.</p>
+            </article>
+
+            <article class="hypothesis rejected">
+                <h3>H3: CarboAir and CarboLite can share parameters</h3>
+                <p class="status">❌ REJECTED</p>
+                <p><strong>Reason:</strong> CarboAir (SG=2.0, bulk density=1.15 g/cm³) is <strong>ultra-low-density</sup> with engineered internal porosity. CarboLite (SG=2.71, bulk density=1.57 g/cm³) is <strong>low-density</strong> with different microstructure. Crush resistance differs: CarboLite 40/70 K-value=17K psi (Sutradhor & Ghassemi, 2025); CarboAir 40/70 shows 12% fines at 8,000 psi (CARBOAIR TDS).</p>
+                <p><strong>But:</strong> No Tavares parameters exist for either. Both currently assigned limestone values.</p>
+            </article>
+
+            <article class="hypothesis rejected">
+                <h3>H4: Hu Sun et al. (2022) ceramics are CarboAir or CarboLite</h3>
+                <p class="status">❌ REJECTED</p>
+                <p><strong>Reason:</strong> Hu Sun et al. state: "ceramic and quartz sand proppant obtained from Changqing oilfield, China" (p. 2). These are Chinese-manufactured ceramics, not CARBO Ceramics products. Hu Sun ceramic bulk density = 1.46/1.43 g/cm³ vs. CarboAir 1.15 and CarboLite 1.57.</p>
+                <p><strong>Implication:</strong> CarboAir/CarboLite TDS data used only as <em>representative</em> properties for simulation setup.</p>
+            </article>
+
+            <article class="hypothesis partial">
+                <h3>H5: Tavares size function captures stronger size effect in sand vs. ceramic</h3>
+                <p class="status">⚠️ PARTIALLY SUPPORTED BUT UNVERIFIED</p>
+                <p><strong>Evidence:</strong> Hu Sun shows 20/40 sand Br=45.68% vs. 40/70 sand Br=30.39% (1.5× difference). Ceramic: 21.22% vs. 12.3% (1.7× difference). Man & Wong (2017) confirm size effect in single-grain tests.</p>
+                <p><strong>Problem:</strong> Tavares size function E₅₀ = E∞ / (1 + (d/d₀)^φ) with d₀=8.07 mm (copper ore) or 100 mm (limestone). Proppants are 0.2–0.4 mm. At d ≪ d₀, E₅₀ ≈ E∞ (constant). <strong>The model predicts NO size effect at proppant scale.</strong></p>
+            </article>
+
+            <article class="hypothesis rejected">
+                <h3>H6: Damage parameter γ calibrates from Mark et al. (2022) 250-day decline</h3>
+                <p class="status">❌ REJECTED</p>
+                <p><strong>Reason:</strong> Mark et al. measure <strong>time-dependent conductivity decline</strong> (LCDF = 0.034–0.186 md-ft/ln(hr)) under constant stress. Tavares γ governs <strong>damage from repeated sub-critical impacts</strong> (Eq. 12: D = 2γ/(2γ-5) · (Eₖ/E)^(2γ/5)). Different physics: static fatigue vs. impact damage accumulation. No direct mapping exists.</p>
+            </article>
+        </section>
+
+        <section id="research-gap">
+            <h2>The Research Gap: Next-Generation Idea</h2>
+            
+            <div class="gap-box">
+                <h3>Core Problem: Scale Mismatch in the Tavares Size Function</h3>
+                <p>The Tavares model was developed for <strong>comminution</strong> (particles 1–100 mm). Its size function:</p>
+                <pre>E₅₀ = E∞ / (1 + (d/d₀)^φ)</pre>
+                <p>with d₀ ≈ 1–100 mm (Table 2: copper ore d₀=8.07 mm, limestone d₀=100 mm).</p>
+                <p><strong>Proppants are 0.2–0.4 mm (200–400 μm).</strong> At d/d₀ ≈ 0.002–0.04, the size function is essentially flat (E₅₀ ≈ E∞). <strong>The model predicts no size effect at proppant scale</strong>, but experiments <strong>clearly show a strong size effect</strong>: smaller particles (40/70) have lower breakage rates than larger (20/40) for both sand and ceramic.</p>
+            </div>
+
+            <h3>Why This Matters for ANSYS Rocky Simulation</h3>
+            <p>In Rocky DEM, every particle gets a random fracture energy from the lognormal distribution. If E₅₀ is constant across 20/40 and 40/70 sizes, <strong>the simulation cannot reproduce the observed size-dependent breakage rates</strong> without ad hoc per-size-class parameter tuning.</p>
+
+            <h3>Next-Generation Idea: Dual-Mechanism Size Function for Proppants</h3>
+            <p>Develop a <strong>modified size function</strong> for the Tavares model that activates at 0.1–1 mm scale:</p>
+            
+            <pre class="equation">E₅₀(d) = E∞ / [1 + (d/d₀)^φ]  ×  [1 + ψ·exp(-d/δ)]   for d < 1 mm</pre>
+            
+            <p>Where:</p>
+            <ul>
+                <li>First term: Original Tavares function (comminution scale, d₀ ~ 10 mm)</li>
+                <li>Second term: <strong>Proppant-scale correction</strong> (ψ, δ fitted to single-grain diametrical compression data)</li>
+                <li>ψ: Amplitude of proppant-scale size effect</li>
+                <li>δ: Characteristic length (~100–300 μm) where surface-flaw statistics transition to volume-flaw statistics</li>
+            </ul>
+
+            <h3>Calibration Path (Actionable)</h3>
+            <ol>
+                <li>Use Man & Wong (2017) single-grain data: failure force vs. grain height for Baylic Sand, Hydroprop, OxSteel, SLB (10–13 grains per type, already measured)</li>
+                <li>Fit ψ and δ for each material class (sand, low-density ceramic, high-density ceramic)</li>
+                <li>Implement in Rocky DEM via user-defined breakage model or parameter override</li>
+                <li>Validate against Hu Sun et al. (2022) breakage rates at 70 MPa for 20/40 vs. 40/70</li>
+            </ol>
+
+            <h3>Impact</h3>
+            <p>This would enable Rocky DEM simulations to <strong>natively capture</strong> the 20/40 vs. 40/70 breakage rate differences observed in Hu Sun et al. (2022) without manual parameter tuning per size class — a fundamental improvement for proppant-scale DEM.</p>
+        </section>
+
+        <section id="unexplained">
+            <h2>What Remains Unexplained</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Issue</th>
+                        <th>Evidence</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>No direct Tavares parameters for any proppant</td>
+                        <td>All 17 parameters assumed from limestone/copper ore</td>
+                        <td class="status-flag">Fundamental gap</td>
+                    </tr>
+                    <tr>
+                        <td>Tavares size function inactive at proppant scale</td>
+                        <td>d₀=8–100 mm vs. d=0.2–0.4 mm → E₅₀≈constant</td>
+                        <td class="status-flag">Model limitation</td>
+                    </tr>
+                    <tr>
+                        <td>CarboAir vs. CarboLite parameter differentiation</td>
+                        <td>Different SG, bulk density, crush resistance; no data</td>
+                        <td class="status-flag">Assumed identical</td>
+                    </tr>
+                    <tr>
+                        <td>Static fatigue (time-dependent) vs. impact damage (γ)</td>
+                        <td>Mark et al. (2022) 250-day data cannot calibrate γ</td>
+                        <td class="status-flag">Different physics</td>
+                    </tr>
+                    <tr>
+                        <td>Hu Sun ceramic ≠ CarboAir/CarboLite</td>
+                        <td>Chinese ceramic, density 1.43–1.46 vs. 1.15/1.57</td>
+                        <td class="status-flag">Representative only</td>
+                    </tr>
+                    <tr>
+                        <td>Mixed proppant breakage (PS 0.25–0.75)</td>
+                        <td>Hu Sun Fig. 10 shows non-linear Br(PS); Tavares has no mixing rule</td>
+                        <td class="status-flag">Not in model</td>
+                    </tr>
+                    <tr>
+                        <td>Conductivity model linkage</td>
+                        <td>Hu Sun Eqs. 12–13 empirical; no mechanistic link to Tavares Br</td>
+                        <td class="status-flag">Gap</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section id="why-stopped">
+            <h2>Why I Stopped Here</h2>
+            <ol>
+                <li><strong>Exhausted all available sources:</strong> Read all 16 papers in <code>mine/</code> including primary Tavares model papers (Tavares & King, 1998; Tavares et al., 2020; Tavares, 2022 KONA review), target experimental paper (Hu Sun et al., 2022), proppant TDS sheets (CarboAir, CarboLite), and analogous mechanical studies (Man & Wong, 2017; Mark et al., 2022; Sutradhor & Ghassemi, 2025).</li>
+                <li><strong>Fundamental gap is documented:</strong> No Tavares parameters exist for proppants in literature. The model was designed for comminution (mm–cm scale), not proppant packs (μm–mm scale).</li>
+                <li><strong>All measurable calibration targets captured:</strong> Hu Sun et al. (2022) provides conductivity vs. stress, breakage rate vs. PS, and empirical prediction model. Man & Wong (2017) provides single-grain and pack properties. Mark et al. (2022) provides long-term conductivity decline. Sutradhor & Ghassemi (2025) provides crush resistance for CarboLite (RC).</li>
+                <li><strong>Research gap is actionable:</strong> The dual-mechanism size function proposal is specific, testable with existing data (Man & Wong single-grain tests), and would directly improve Rocky DEM simulations for proppants.</li>
+                <li><strong>Further reading would only find comminution-scale data:</strong> Searching for "Tavares model proppant" or "Rocky DEM proppant breakage parameters" returns the same Tavares et al. (2020) paper and marketing materials—no proppant-specific parameters.</li>
+            </ol>
+        </section>
+
+        <footer>
+            <p><a href="index.html">← Back to Parameters</a></p>
+            <p>Full analysis: <a href="../results/answer_mine.md">answer_mine.md</a> | Data: <a href="../results/values_mine.csv">values_mine.csv</a></p>
+        </footer>
+    </main>
+</body>
+</html>

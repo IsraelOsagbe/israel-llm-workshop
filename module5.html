@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Module 5: Incompressible Flow Algorithms — CFD Course</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<h1>Module 5: Incompressible Flow Algorithms</h1>
+<p class="subtitle">Projection Methods, Pressure-Poisson, Schur Complement, Inf-Sup Stability</p>
+</header>
+
+<main>
+<nav class="breadcrumb">
+<a href="index.html">← Course Home</a> | <a href="module4.html">← Previous</a> | <a href="module6.html">Next: Turbulence Modeling →</a>
+</nav>
+
+<section>
+<h2>5.1 The Incompressible Navier–Stokes as a DAE</h2>
+<p>The incompressible equations form a <strong>differential-algebraic equation (DAE) of index 2</strong>:</p>
+<div class="equation-box">
+∂u/∂t + u·∇u = −∇p + ν∇²u + f   (momentum)
+∇·u = 0                              (constraint)
+</div>
+<p>The pressure <em>p</em> is a <strong>Lagrange multiplier</strong> enforcing the divergence-free constraint. No time derivative of <em>p</em> exists — pressure is determined <strong>instantaneously</strong> by the elliptic pressure-Poisson equation.</p>
+
+<h3>Helmholtz–Hodge Decomposition (Continuous)</h3>
+<p>Any vector field <em>w</em> on a domain <em>Ω</em> with boundary <em>∂Ω</em> decomposes uniquely:</p>
+<div class="equation-box">
+w = u + ∇φ,    ∇·u = 0,    u·n|_∂Ω = w·n|_∂Ω
+</div>
+<p>The <strong>Leray projector</strong> <em>P : w ↦ u</em> is orthogonal in <em>L²</em>: <em>P = I − ∇Δ⁻¹∇·</em> (with appropriate BCs). The incompressible NSE is <em>u_t = −P(u·∇u) + νPΔu + Pf</em>.</p>
+</section>
+
+<section>
+<h2>5.2 Projection Methods (Chorin, Temam, 1967–68)</h2>
+<p>Split each time step into a <strong>prediction</strong> (ignoring incompressibility) and a <strong>projection</strong> (enforcing ∇·u = 0).</p>
+
+<h3>Standard Projection (First-Order)</h3>
+<div class="equation-box">
+u* = u^n + Δt [ −u^n·∇u^n + ν∇²u^n + f^n ]   (predictor)
+∇²φ = (1/Δt) ∇·u*                            (pressure-Poisson)
+u^{n+1} = u* − Δt ∇φ                         (projection)
+p^{n+1} = φ + p^n                             (pressure update)
+</div>
+<p><strong>Error:</strong> <em>u^{n+1}</em> satisfies ∇·u^{n+1} = 0 but <em>u^{n+1} ≠ u(t^{n+1}) + O(Δt)</em> due to boundary condition inconsistency (numerical boundary layer).</p>
+
+<h3>Incremental Projection (Second-Order, Goda, 1979)</h3>
+<div class="equation-box">
+u* = u^n + Δt [ −(3/2)u^n·∇u^n + (1/2)u^{n-1}·∇u^{n-1} + ν∇²u^{n+1/2} + f^{n+1/2} ]
+∇²φ = (1/Δt) ∇·u*
+u^{n+1} = u* − Δt ∇φ
+p^{n+1} = p^n + φ − ν∇·u^{n+1}   (pressure correction)
+</div>
+<p>Uses <strong>implicit viscous term</strong> (Crank–Nicolson) and <strong>Adams–Bashforth</strong> for convection. Achieves second-order accuracy with consistent pressure boundary conditions.</p>
+
+<h3>Rotational Form (Timmermans, Minev, Van De Vosse, 1996)</h3>
+<p>Reformulates the pressure-Poisson equation to enforce the correct Neumann condition at walls:</p>
+<div class="equation-box">
+∇²φ = (1/Δt) ∇·u* − ν∇×(∇×u*)
+</div>
+<p>Eliminates the numerical boundary layer — <strong>velocity satisfies no-slip exactly at discrete level</strong>. Essential for high-order temporal accuracy at boundaries.</p>
+</section>
+
+<section>
+<h2>5.3 Pressure-Poisson Equation: Boundary Conditions &amp; Consistency</h2>
+<p>The pressure-Poisson equation requires a boundary condition. The <strong>correct Neumann condition</strong> at a solid wall (<em>u = 0</em>) is derived from the momentum equation:</p>
+<div class="equation-box">
+∂p/∂n = n·(ν∇²u + f) = ν n·∇²u   (since f=0 at wall)
+</div>
+<p>In discrete form, this becomes a <strong>compatibility condition</strong> for the Poisson solve. Inconsistent BCs (e.g., ∂p/∂n = 0) introduce an <strong>O(1) error in pressure</strong> and <strong>O(Δt^{1/2})</strong> error in velocity near walls.</p>
+
+<h3>Consistent Discretization (Staggered vs. Collocated)</h3>
+<ul>
+<li><strong>Staggered (MAC):</strong> Pressure at cell centers, velocity at faces. Natural discrete divergence/gradient are adjoint. Pressure-Poisson is symmetric positive definite. No checkerboard modes.</li>
+<li><strong>Collocated (Rhie–Chow):</strong> All variables at centers. Face velocity interpolated: <em>u_f = u_f^interp − (1/a_p)_f ∇p_f</em>. Requires careful pressure-Poisson discretization to maintain adjoint property.</li>
+</ul>
+</section>
+
+<section>
+<h2>5.4 Discrete Inf-Sup Stability (LBB Condition)</h2>
+<p>For a mixed finite element/volume discretization of the saddle-point problem:</p>
+<div class="equation-box">
+Find (u_h, p_h) ∈ V_h × Q_h:  a(u_h, v_h) + b(v_h, p_h) = (f, v_h)  ∀v_h
+                                      b(u_h, q_h) = 0                       ∀q_h
+</div>
+<p>The <strong>Ladyzhenskaya–Babuška–Brezzi (LBB) condition</strong> is necessary and sufficient for stability:</p>
+<div class="equation-box">
+inf_{q_h∈Q_h} sup_{v_h∈V_h}  b(v_h, q_h) / (||v_h||_V ||q_h||_Q) ≥ β > 0
+</div>
+<p>where <em>b(v, q) = −(∇·v, q)</em>. Violations cause <strong>spurious pressure modes</strong> (checkerboard).</p>
+
+<h3>Stable Velocity–Pressure Pairs</h3>
+<table>
+<thead>
+<tr><th>Element</th><th>Velocity</th><th>Pressure</th><th>Order</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td>Taylor–Hood</td><td>P2 (quadratic)</td><td>P1 (linear)</td><td>2</td><td>Standard FEM choice, stable</td></tr>
+<tr><td>Mini-element</td><td>P1 + bubble</td><td>P1</td><td>1</td><td>Lowest-order stable</td></tr>
+<tr><td>Crouzeix–Raviart</td><td>P1 nc</td><td>P0</td><td>1</td><td>Non-conforming, stable</td></tr>
+<tr><td>Q2–Q1 (hexahedra)</td><td>Q2</td><td>Q1</td><td>2</td><td>Common in spectral elements</td></tr>
+<tr><td>Staggered FV</td><td>Face-centered</td><td>Cell-centered</td><td>2</td><td>Inherently stable (MAC)</td></tr>
+<tr><td>Collocated FV + Rhie–Chow</td><td>Cell-centered</td><td>Cell-centered</td><td>2</td><td>Stable if interpolation is consistent</td></tr>
+</tbody>
+</table>
+
+<h3>Stabilized Methods (Equal-Order)</h3>
+<p>For equal-order interpolation (P1–P1, Q1–Q1), add stabilization:</p>
+<ul>
+<li><strong>PSPG (Pressure-Stabilizing Petrov–Galerkin):</strong> Add <em>τ ∇q · (u·∇u + ∇p − νΔu − f)</em></li>
+<li><strong>Brezzi–Pitkäranta:</strong> Add <em>α h² (∇p, ∇q)</em></li>
+<li><strong>Local Projection Stabilization (LPS):</strong> Project pressure gradient fluctuations</li>
+</ul>
+</section>
+
+<section>
+<h2>5.5 Coupled vs. Segregated Solvers</h2>
+
+<h3>Segregated (SIMPLE Family)</h3>
+<p>Solve momentum and pressure sequentially:</p>
+<ol>
+<li>Solve momentum with current pressure → <em>u*</em></li>
+<li>Solve pressure correction equation: <em>∇·(A⁻¹∇p') = ∇·u*</em></li>
+<li>Correct: <em>u = u* − A⁻¹∇p', p = p + p'</em></li>
+<li>Under-relax pressure: <em>p^{new} = p^{old} + α p'</em></li>
+</ol>
+<p><strong>SIMPLEC, PISO, SIMPLER</strong> vary the correction equation. Slow convergence for high-Re, complex geometries. Easy to implement.</p>
+
+<h3>Coupled (Monolithic Newton–Krylov)</h3>
+<p>Solve the full nonlinear system simultaneously:</p>
+<div class="equation-box">
+[ A   B^T ] [ Δu ] = [ R_u ]
+[ B    0  ] [ Δp ]   [ R_p ]
+</div>
+<p>Use physics-based preconditioner (PCD, LSC, AL) with Krylov solver. <strong>Quadratic convergence near solution</strong>, mesh-independent iterations with good preconditioner. Memory intensive but robust.</p>
+
+<h3>All-Speed Preconditioned Coupled Solvers</h3>
+<p>For variable-density/low-Mach, the system becomes:</p>
+<div class="equation-box">
+[ A   B^T  C ] [ Δu ] = [ R_u ]
+[ B    0   0 ] [ Δp ]   [ R_p ]
+[ C^T  0   D ] [ Δρ ]   [ R_ρ ]
+</div>
+<p>Extend PCD/LSC to 3×3 block structure. Essential for combustion, atmospheric flows.</p>
+</section>
+
+<section>
+<h2>5.6 High-Order Temporal Schemes for Incompressible Flow</h2>
+
+<h3>BDF-k with Projection</h3>
+<p>Backward Differentiation Formulas (BDF) are A-stable up to k=2, stiffly accurate:</p>
+<div class="equation-box">
+∑_{j=0}^k α_j u^{n+1-j} = Δt [ −P(u·∇u) + νPΔu + Pf ]^{n+1}
+</div>
+<p>Requires solving a coupled system at each step. BDF2 with incremental projection is a good compromise.</p>
+
+<h3>IMEX for Incompressible Flow</h3>
+<p>Treat viscous terms implicitly, convection explicitly:</p>
+<div class="equation-box">
+(I − γΔt νPΔ) u^{n+1} = RHS_explicit + P(γΔt f^{n+1})
+</div>
+<p>Only the <strong>Helmholtz operator (I − γνΔ)</strong> is inverted per velocity component — much cheaper than full coupled solve.</p>
+
+<h3>Spectral Deferred Correction (SDC)</h3>
+<p>High-order via iterative correction on a Picard integral formulation. Compatible with projection framework. Achieves arbitrary order with low-storage RK-like structure.</p>
+</section>
+
+<section>
+<h2>5.7 Boundary Conditions for Incompressible Flow</h2>
+<table>
+<thead>
+<tr><th>BC Type</th><th>Velocity</th><th>Pressure</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td>No-slip wall</td><td>u = 0</td><td>∂p/∂n = ν n·∇²u</td><td>Rotational form eliminates numerical BL</td></tr>
+<tr><td>Slip/symmetry</td><td>u·n = 0, n×(∇u·n) = 0</td><td>∂p/∂n = 0</td><td>Natural for projection</td></tr>
+<tr><td>Inflow (Dirichlet)</td><td>u = u_in(t)</td><td>∂p/∂n from momentum</td><td>Over-specified for NS; use do-nothing</td></tr>
+<tr><td>Outflow (traction-free)</td><td>−p n + ν∇u·n = 0</td><td>p = 0 (or ∂p/∂n = 0)</td><td>Do-nothing: ν∇u·n − p n = 0</td></tr>
+<tr><td>Periodic</td><td>u(x+L) = u(x)</td><td>p(x+L) = p(x)</td><td>Compatible with FFT solvers</td></tr>
+</tbody>
+</table>
+
+<h3>Open Boundary Conditions (OBC)</h3>
+<p>For external flows, use <strong>non-reflecting</strong> or <strong>absorbing</strong> BCs:</p>
+<ul>
+<li><strong>Orlanski-type:</strong> ∂φ/∂t + c ∂φ/∂n = 0 for outgoing waves</li>
+<li><strong>Perfectly Matched Layer (PML):</strong> Absorbing layer with complex coordinate stretching</li>
+<li><strong>Buffer zones / sponge layers:</strong> Add damping term <em>−σ(x)(u − u_∞)</em> near boundary</li>
+</ul>
+</section>
+
+<section>
+<h2>5.8 Fast Pressure Solvers</h2>
+<p>The pressure-Poisson solve dominates cost in projection methods.</p>
+
+<ul>
+<li><strong>FFT (periodic/rectangular):</strong> O(N log N), exact diagonalization</li>
+<li><strong>Geometric Multigrid (structured):</strong> O(N), optimal</li>
+<li><strong>Algebraic Multigrid (unstructured):</strong> O(N), robust (BoomerAMG, GAMG)</li>
+<li><strong>Fast Multipole / H-matrices:</strong> O(N) for dense Schur complements</li>
+<li><strong>Direct sparse (SuperLU, MUMPS, PARDISO):</strong> Good for moderate 2D/3D, memory heavy</li>
+</ul>
+
+<h3>Pressure Schur Complement Preconditioning</h3>
+<p>In coupled solvers, the pressure Schur complement <em>S = B A⁻¹ B^T</em> is the bottleneck. <strong>PCD/LSC</strong> approximate <em>S⁻¹</em> using AMG on pressure-Poisson and pressure convection-diffusion operators.</p>
+</section>
+
+<section class="socratic-section">
+<h2>Socratic Questions</h2>
+
+<div class="socratic" data-question="projection-consistency">
+<p><strong>Question 1:</strong> For the standard projection method, show that the discrete velocity <em>u^{n+1}</em> satisfies ∇_h·u^{n+1} = 0 exactly, but the discrete pressure <em>p^{n+1}</em> does not satisfy the correct Neumann condition at walls. Derive the leading-order error in the wall-normal pressure gradient. How does the rotational form fix this?</p>
+</div>
+
+<div class="socratic" data-question="inf-sup">
+<p><strong>Question 2:</strong> Consider a 1D staggered grid (pressure at cell centers, velocity at faces) and a 1D collocated grid (both at centers). Discretize the divergence and gradient operators. Show that on the staggered grid, the discrete divergence and gradient are negative adjoints, and the pressure-Poisson matrix is an M-matrix. On the collocated grid, show that a checkerboard pressure mode (alternating +1, −1) is in the null space of the discrete Laplacian. How does Rhie–Chow interpolation remove this null space?</p>
+</div>
+
+<div class="socratic" data-question="pcd-derivation">
+<p><strong>Question 3:</strong> For the incompressible NSE linearized about a steady state, the Jacobian has the saddle-point structure <em>J = [A B^T; B 0]</em>. Derive the exact block factorization <em>J = [I 0; B A⁻¹ I] [A 0; 0 −S] [I A⁻¹B^T; 0 I]</em> where <em>S = B A⁻¹ B^T</em>. Show that the PCD preconditioner approximates <em>S⁻¹ ≈ (F_p A_p⁻¹ B_p^T)⁻¹</em> where <em>F_p</em> is the pressure convection-diffusion operator. Why is <em>A_p</em> the pressure mass matrix and not the pressure Laplacian?</p>
+</div>
+
+<div class="socratic" data-question="imex-incompressible">
+<p><strong>Question 4:</strong> Design a 2nd-order IMEX scheme for incompressible flow where the viscous term is treated implicitly and convection explicitly. Write the stage equations for ARS(2,2,2). Show that the implicit solve decouples into three independent Helmholtz solves (one per velocity component) plus a pressure-Poisson solve. What is the CFL limit for the explicit convection part?</p>
+</div>
+
+<div class="socratic" data-question="boundary-conditions">
+<p><strong>Question 5:</strong> For an external flow simulation (flow past a cylinder), compare the following outflow boundary conditions: (a) do-nothing (traction-free), (b) constant pressure <em>p = 0</em>, (c) convective Orlanski condition. Analyze the reflection coefficient for each using a 1D model problem. Which is most appropriate for (i) steady RANS, (ii) unsteady LES of vortex shedding?</p>
+</div>
+
+</section>
+</main>
+
+<footer>
+<p><a href="module4.html">← Module 4: Linear Solvers &amp; Preconditioning</a> | <a href="index.html">Course Home</a> | <a href="module6.html">Next: Turbulence Modeling →</a></p>
+</footer>
+<script src="socratic.js" defer></script>
+</body>
+</html>

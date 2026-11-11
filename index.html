@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tavares Breakage Model Parameters for Proppants - Workshop</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Tavares Breakage Model Parameters for Sand & Ceramic Proppants</h1>
+        <p class="subtitle">Calibration for ANSYS Rocky DEM to Match Hu Sun et al. (2022) Fracture Conductivity Results</p>
+    </header>
+
+    <nav>
+        <a href="index.html" class="active">Overview & Parameters</a>
+        <a href="hypothesis.html">Hypothesis & Research Gap</a>
+    </nav>
+
+    <main>
+        <section id="background">
+            <h2>Background</h2>
+            <p>The <strong>Tavares breakage model</strong> (Tavares et al., 2020, <em>Powder Technology</em> 362:208–220) is implemented in ANSYS Rocky DEM v4.3+ for particle breakage simulation. It requires 17 parameters governing:</p>
+            <ul>
+                <li><strong>Breakage probability</strong>: Size-dependent fracture energy distribution (E∞, d₀, φ, σ)</li>
+                <li><strong>Damage accumulation</strong>: Weakening by repeated sub-critical stressing (γ)</li>
+                <li><strong>Fragment size distribution</strong>: Energy-dependent progeny distribution (A, b′, αₙ/βₙ for n=1.2, 1.5, 2, 4, 25, 50, 75)</li>
+            </ul>
+            <p>This work calibrates the model for <strong>quartz sand</strong> and <strong>ceramic proppants (CarboAir, CarboLite)</strong> to match the experimental fracture conductivity and breakage behavior published by <strong>Hu Sun et al. (2022)</strong> in <em>ACS Omega</em> 7:10243–10254.</p>
+        </section>
+
+        <section id="key-finding">
+            <h2>⚠️ Key Finding: No Published Parameters Exist</h2>
+            <div class="alert-box">
+                <p><strong>Critical limitation:</strong> No Tavares model parameters have been published for any proppant material. All values below are <strong>assumed from surrogate materials</strong> in Tavares et al. (2020):</p>
+                <ul>
+                    <li><strong>Ceramics (CarboAir, CarboLite)</strong> → Assumed from <strong>limestone</strong> (weakest material in Tavares et al., Table 2)</li>
+                    <li><strong>Quartz sand</strong> → Assumed from <strong>copper ore</strong> (strongest material in Tavares et al., Table 2)</li>
+                </ul>
+                <p>This is documented as <strong>Assumption</strong> in the parameter table. See <a href="hypothesis.html">Hypothesis page</a> for why this matters and the research gap it creates.</p>
+            </div>
+        </section>
+
+        <section id="parameters">
+            <h2>Proposed Parameter Table</h2>
+            <p>Full table with sources and assumption flags: <a href="../results/values_mine.csv" download>values_mine.csv</a></p>
+            
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Quartz Sand<br>(20/40 &amp; 40/70)</th>
+                            <th>Ceramic (CarboAir &amp; CarboLite)<br>(20/40 &amp; 40/70)</th>
+                            <th>Unit</th>
+                            <th>Source / Assumption</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>E∞</td>
+                            <td>213.5</td>
+                            <td>7.0</td>
+                            <td>J/kg</td>
+                            <td>Tavares et al. (2020) Table 2 — <strong>Assumed</strong>: copper ore (sand) / limestone (ceramic)</td>
+                        </tr>
+                        <tr>
+                            <td>d₀</td>
+                            <td>8.07</td>
+                            <td>100</td>
+                            <td>mm</td>
+                            <td>Tavares et al. (2020) Table 2 — <strong>Assumed</strong></td>
+                        </tr>
+                        <tr>
+                            <td>φ</td>
+                            <td>1.22</td>
+                            <td>0.80</td>
+                            <td>–</td>
+                            <td>Tavares et al. (2020) Table 2 — <strong>Assumed</strong></td>
+                        </tr>
+                        <tr>
+                            <td>σ</td>
+                            <td>0.799</td>
+                            <td>0.801</td>
+                            <td>–</td>
+                            <td>Tavares et al. (2020) Table 2 — <strong>Assumed</strong></td>
+                        </tr>
+                        <tr>
+                            <td>γ</td>
+                            <td>5.0</td>
+                            <td>5.4</td>
+                            <td>–</td>
+                            <td>Tavares et al. (2020) Table 2 — <strong>Assumed</strong></td>
+                        </tr>
+                        <tr>
+                            <td>A</td>
+                            <td>67.7</td>
+                            <td>53.3</td>
+                            <td>%</td>
+                            <td>Tavares et al. (2020) Table 2 — <strong>Assumed</strong></td>
+                        </tr>
+                        <tr>
+                            <td>b′</td>
+                            <td>0.029</td>
+                            <td>0.033</td>
+                            <td>–</td>
+                            <td>Tavares et al. (2020) Table 2 — <strong>Assumed</strong></td>
+                        </tr>
+                        <tr>
+                            <td>α₁.₂/β₁.₂</td>
+                            <td>0.51/11.95</td>
+                            <td>0.19/7.78</td>
+                            <td>–</td>
+                            <td>Tavares et al. (2020) Table 2 — <strong>Assumed</strong></td>
+                        </tr>
+                        <tr>
+                            <td>α₁.₅/β₁.₅</td>
+                            <td>1.07/13.87</td>
+                            <td>0.56/7.51</td>
+                            <td>–</td>
+                            <td>Tavares et al. (2020) Table 2 — <strong>Assumed</strong></td>
+                        </tr>
+                        <tr>
+                            <td>α₂/β₂</td>
+                            <td>1.01/8.09</td>
+                            <td>0.78/5.55</td>
+                            <td>–</td>
+                            <td>Tavares et al. (2020) Table 2 — <strong>Assumed</strong></td>
+                        </tr>
+                        <tr>
+                            <td>α₄/β₄</td>
+                            <td>1.08/3.03</td>
+                            <td>1.12/3.01</td>
+                            <td>–</td>
+                            <td>Tavares et al. (2020) Table 2 — <strong>Assumed</strong></td>
+                        </tr>
+                        <tr>
+                            <td>α₂₅/β₂₅</td>
+                            <td>1.01/0.53</td>
+                            <td>1.17/0.54</td>
+                            <td>–</td>
+                            <td>Tavares et al. (2020) Table 2 — <strong>Assumed</strong></td>
+                        </tr>
+                        <tr>
+                            <td>α₅₀/β₅₀</td>
+                            <td>1.03/0.36</td>
+                            <td>1.43/0.40</td>
+                            <td>–</td>
+                            <td>Tavares et al. (2020) Table 2 — <strong>Assumed</strong></td>
+                        </tr>
+                        <tr>
+                            <td>α₇₅/β₇₅</td>
+                            <td>1.03/0.30</td>
+                            <td>1.92/0.42</td>
+                            <td>–</td>
+                            <td>Tavares et al. (2020) Table 2 — <strong>Assumed</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Proppant Physical Properties (Measured - Hu Sun et al., 2022)</h3>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Property</th>
+                            <th>20/40 Sand</th>
+                            <th>40/70 Sand</th>
+                            <th>20/40 Ceramic (Hu Sun)</th>
+                            <th>40/70 Ceramic (Hu Sun)</th>
+                            <th>CarboAir (TDS)</th>
+                            <th>CarboLite (TDS)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Particle diameter (μm)</td>
+                            <td>372</td>
+                            <td>211</td>
+                            <td>357</td>
+                            <td>200</td>
+                            <td>300 (mean)</td>
+                            <td>465 / 300 (median)</td>
+                        </tr>
+                        <tr>
+                            <td>Bulk density (g/cm³)</td>
+                            <td>1.53</td>
+                            <td>1.47</td>
+                            <td>1.46</td>
+                            <td>1.43</td>
+                            <td>1.15</td>
+                            <td>1.57</td>
+                        </tr>
+                        <tr>
+                            <td>Sphericity</td>
+                            <td>0.69</td>
+                            <td>0.61</td>
+                            <td>0.90</td>
+                            <td>0.90</td>
+                            <td>0.9</td>
+                            <td>0.9</td>
+                        </tr>
+                        <tr>
+                            <td>Roundness</td>
+                            <td>0.64</td>
+                            <td>0.50</td>
+                            <td>0.89</td>
+                            <td>0.90</td>
+                            <td>0.9</td>
+                            <td>0.9</td>
+                        </tr>
+                        <tr>
+                            <td>Apparent SG</td>
+                            <td>2.65</td>
+                            <td>2.65</td>
+                            <td>~2.65</td>
+                            <td>~2.65</td>
+                            <td>2.0</td>
+                            <td>2.71</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="calibration-targets">
+            <h2>Calibration Targets from Hu Sun et al. (2022)</h2>
+            
+            <h3>Conductivity vs. Closure Stress (Figure 6)</h3>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Stress (MPa)</th>
+                            <th>20/40 Ceramic</th>
+                            <th>40/70 Ceramic</th>
+                            <th>20/40 Sand</th>
+                            <th>40/70 Sand</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>10</td><td>~1800</td><td>~600</td><td>~300</td><td>~150</td></tr>
+                        <tr><td>20</td><td>~800</td><td>~300</td><td>~80</td><td>~40</td></tr>
+                        <tr><td>30</td><td>~300</td><td>~120</td><td>~20</td><td>~10</td></tr>
+                        <tr><td>40</td><td>~150</td><td>~60</td><td>~10</td><td>~5</td></tr>
+                        <tr><td>50</td><td>~100</td><td>~30</td><td>~5</td><td>~3</td></tr>
+                        <tr><td>60</td><td>~80</td><td>~20</td><td>~4</td><td>~2</td></tr>
+                        <tr><td>70</td><td>62</td><td>~15</td><td>3</td><td>~1</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Breakage Rate at 70 MPa vs. Sand Volume Proportion PS (Figure 10)</h3>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>PS (Sand Vol. Fraction)</th>
+                            <th>20/40 Mesh Breakage %</th>
+                            <th>40/70 Mesh Breakage %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>0.0 (Pure Ceramic)</td><td>21.22</td><td>12.30</td></tr>
+                        <tr><td>0.25</td><td>~22.5</td><td>~14.0</td></tr>
+                        <tr><td>0.33</td><td>~23</td><td>~15</td></tr>
+                        <tr><td>0.50</td><td>~25</td><td>~18</td></tr>
+                        <tr><td>0.67</td><td>~35</td><td>~22</td></tr>
+                        <tr><td>0.75</td><td>~40</td><td>~27</td></tr>
+                        <tr><td>1.0 (Pure Sand)</td><td>45.68</td><td>30.39</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Hu Sun's Empirical Conductivity Model (Eqs. 12–13)</h3>
+            <p><strong>20/40 mesh:</strong> kWf = (32.344·PS – 109.371)·ln(σ) + (203.87·PS – 518.86)</p>
+            <p><strong>40/70 mesh:</strong> kWf = (5.8535·PS – 25.844)·ln(σ) + (43.574·PS – 123.28)</p>
+            <p>Where kWf = conductivity (μm²·cm), σ = closure stress (MPa), PS = sand volume proportion.</p>
+        </section>
+
+        <section id="references">
+            <h2>Key References (APA 7th)</h2>
+            <ol class="references">
+                <li>Hu Sun, B. He, H. Xu, F. Zhou, M. Zhang, H. Li, G. Yin, S. Chen, X. Xu, &amp; B. Li. (2022). Experimental investigation on the fracture conductivity behavior of quartz sand and ceramic mixed proppants. <em>ACS Omega</em>, 7(12), 10243–10254. https://doi.org/10.1021/acsomega.1c06828</li>
+                <li>Tavares, L. M., André, F. P., Potapov, A., &amp; Maliska Jr, C. (2020). Adapting a breakage model to discrete elements using polyhedral particles. <em>Powder Technology</em>, 362, 208–220. https://doi.org/10.1016/j.powtec.2019.12.007</li>
+                <li>Man, S., &amp; Wong, R. C. K. (2017). Compression and crushing behavior of ceramic proppants and sand under high stresses. <em>Journal of Petroleum Science and Engineering</em>, 158, 268–283. https://doi.org/10.1016/j.petrol.2017.08.052</li>
+                <li>Mark, C. P., Green, C. A., McGill, M., &amp; Milton-Tayler, D. (2022). Extended-time conductivity testing of proppants used for multi-stage horizontal completions. <em>SPE-205272-MS</em>. https://doi.org/10.2118/205272-MS</li>
+                <li>Sutradhor, S. S., &amp; Ghassemi, A. (2025). Crush resistance and packing strength of candidate proppant for enhanced geothermal systems. <em>Proceedings, 50th Workshop on Geothermal Reservoir Engineering</em>, SGP-TR-229.</li>
+                <li>CARBO Ceramics Inc. (2025). <em>CARBOAIR high-transport, ultra low-density ceramic proppant technology</em> [Technical Data Sheet].</li>
+                <li>CARBO Ceramics Inc. (2025). <em>CARBOLITE high-performance, low-density ceramic proppant technology</em> [Technical Data Sheet].</li>
+            </ol>
+        </section>
+
+        <footer>
+            <p><a href="hypothesis.html">→ View Hypothesis & Research Gap</a></p>
+            <p>Full analysis: <a href="../results/answer_mine.md">answer_mine.md</a> | Data: <a href="../results/values_mine.csv">values_mine.csv</a></p>
+        </footer>
+    </main>
+</body>
+</html>

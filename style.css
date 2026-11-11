@@ -1,0 +1,315 @@
+/* Style for Tavares Breakage Model Proppant Parameters Website */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f8f9fa;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+header h1 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+nav {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+nav a {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background: white;
+    color: #2c5282;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 500;
+    border: 2px solid #e2e8f0;
+    transition: all 0.2s;
+}
+
+nav a:hover {
+    background: #edf2f7;
+    border-color: #2c5282;
+}
+
+nav a.active {
+    background: #2c5282;
+    color: white;
+    border-color: #2c5282;
+}
+
+main {
+    background: white;
+    border-radius: 8px;
+    padding: 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+section {
+    margin-bottom: 3rem;
+}
+
+section:last-of-type {
+    margin-bottom: 0;
+}
+
+h2 {
+    font-size: 1.5rem;
+    color: #1e3a5f;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+h3 {
+    font-size: 1.2rem;
+    color: #2c5282;
+    margin: 1.5rem 0 0.75rem;
+}
+
+h4 {
+    font-size: 1rem;
+    color: #2d3748;
+    margin: 1rem 0 0.5rem;
+}
+
+p {
+    margin-bottom: 1rem;
+}
+
+ul, ol {
+    margin: 1rem 0 1rem 1.5rem;
+}
+
+li {
+    margin-bottom: 0.5rem;
+}
+
+a {
+    color: #2c5282;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+code {
+    background: #edf2f7;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+    font-size: 0.9em;
+}
+
+pre {
+    background: #1a202c;
+    color: #e2e8f0;
+    padding: 1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 1rem 0;
+    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+}
+
+.table-container {
+    overflow-x: auto;
+    margin: 1rem 0;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    min-width: 600px;
+}
+
+th, td {
+    padding: 0.75rem;
+    text-align: left;
+    border: 1px solid #e2e8f0;
+}
+
+th {
+    background: #edf2f7;
+    font-weight: 600;
+    color: #1e3a5f;
+    position: sticky;
+    top: 0;
+}
+
+tr:nth-child(even) {
+    background: #f7fafc;
+}
+
+tr:hover {
+    background: #edf2f7;
+}
+
+.alert-box {
+    background: #fffaf0;
+    border: 2px solid #f6ad55;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+}
+
+.alert-box p:first-child {
+    margin-top: 0;
+}
+
+.alert-box p:last-child {
+    margin-bottom: 0;
+}
+
+.gap-box {
+    background: #ebf8ff;
+    border: 2px solid #4299e1;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+}
+
+.hypothesis {
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+}
+
+.hypothesis h3 {
+    margin-top: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.hypothesis.rejected {
+    border-left: 4px solid #e53e3e;
+}
+
+.hypothesis.partial {
+    border-left: 4px solid #dd6b20;
+}
+
+.status {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.equation {
+    background: #1a202c;
+    color: #e2e8f0;
+    padding: 1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+    font-size: 0.95rem;
+    text-align: center;
+    margin: 1rem 0;
+}
+
+.references {
+    font-size: 0.9rem;
+    line-height: 1.8;
+}
+
+.references li {
+    margin-bottom: 0.75rem;
+}
+
+footer {
+    text-align: center;
+    padding-top: 2rem;
+    border-top: 1px solid #e2e8f0;
+    color: #718096;
+    font-size: 0.9rem;
+}
+
+footer a {
+    color: #2c5282;
+}
+
+footer p {
+    margin-bottom: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+    
+    header h1 {
+        font-size: 1.5rem;
+    }
+    
+    main {
+        padding: 1rem;
+    }
+    
+    nav a {
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
+    }
+    
+    table {
+        font-size: 0.75rem;
+    }
+    
+    th, td {
+        padding: 0.5rem;
+    }
+}
+
+strong {
+    color: #1e3a5f;
+}
+
+em {
+    color: #4a5568;
+}
+
+.status-flag {
+    font-weight: 600;
+    color: #c53030;
+}

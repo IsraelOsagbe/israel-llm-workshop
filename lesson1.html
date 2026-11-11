@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 1: What Is CFD? — Computational Fluid Dynamics</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<h1>Lesson 1: What Is CFD?</h1>
+<p class="subtitle">Computational Fluid Dynamics — First Year Introduction</p>
+</header>
+
+<main>
+<nav class="breadcrumb">
+<a href="index.html">← Home</a> | <a href="lesson2.html">Next: The Governing Equations →</a>
+</nav>
+
+<section>
+<h2>Why Simulate Fluids?</h2>
+<p>Fluid dynamics is everywhere: air over an aircraft wing, blood through arteries, coolant in a battery pack, weather systems, oil in pipelines. Traditionally, engineers studied fluids by building physical models and testing them in wind tunnels or water channels. This works, but it has limitations:</p>
+
+<ul>
+<li><strong>Cost and time:</strong> Building and instrumenting a model takes weeks or months.</li>
+<li><strong>Scale effects:</strong> A 1:10 scale model doesn't perfectly match full-scale physics (Reynolds number mismatch).</li>
+<li><strong>Access:</strong> You can't put pressure taps inside a beating heart or a running turbine.</li>
+<li><strong>Iteration:</strong> Each design change requires a new physical model.</li>
+</ul>
+
+<p>Computational Fluid Dynamics (CFD) replaces (or augments) physical experiments with numerical simulations on a computer. The fluid domain is represented by a discrete mesh, the governing equations are solved at each mesh point, and the result is a prediction of velocity, pressure, temperature, and other fields throughout the domain.</p>
+</section>
+
+<section>
+<h2>The CFD Promise — And Its Limits</h2>
+<p>CFD lets you:</p>
+<ul>
+<li>Explore hundreds of design variants in the time of one wind-tunnel test</li>
+<li>See inside the flow — full-field data, not just a few probe points</li>
+<li>Test conditions that are dangerous, impossible, or too expensive to reproduce physically</li>
+</ul>
+
+<p>But CFD is not a magic black box. The results are only as good as:</p>
+<ul>
+<li>The <strong>mathematical model</strong> (which equations, which turbulence model)</li>
+<li>The <strong>mesh</strong> (resolution, quality, suitability for the physics)</li>
+<li>The <strong>numerical method</strong> (discretization scheme, solver settings)</li>
+<li>The <strong>boundary conditions</strong> (how well they represent reality)</li>
+</ul>
+
+<p>A first-year engineer's job is not to "run CFD" but to <strong>set up, verify, and interpret</strong> simulations with healthy skepticism.</p>
+</section>
+
+<section>
+<h2>A Tiny Worked Example: 1D Heat Conduction</h2>
+<p>Before tackling full fluid flow, consider steady 1D heat conduction in a rod:</p>
+<pre><code>d/dx (k dT/dx) = 0</code></pre>
+<p>with fixed temperatures at both ends. This is a boundary-value problem. The exact solution is a linear temperature profile. A CFD code would:</p>
+<ol>
+<li>Divide the rod into small segments (a 1D mesh)</li>
+<li>Approximate the derivative at each node using neighboring values</li>
+<li>Solve the resulting small linear system</li>
+<li>Return the temperature at each node</li>
+</ol>
+<p>The same pattern — <strong>discretize → solve → interpret</strong> — underlies all CFD, from this toy problem to a full 3D turbulent simulation.</p>
+</section>
+
+<section class="socratic-section">
+<h2>Check Your Understanding</h2>
+
+<div class="socratic" data-question="cfd-purpose">
+<p><strong>Question 1:</strong> A colleague says, "CFD is great — you just mesh the geometry, hit run, and you get the right answer." What is wrong with this statement? Name at least three specific things that can go wrong between meshing and a trustworthy result.</p>
+</div>
+
+<div class="socratic" data-question="cfd-vs-experiment">
+<p><strong>Question 2:</strong> You're designing a new drone propeller. You have budget for either (a) one wind-tunnel test of a 3D-printed prototype, or (b) a week of CFD simulations exploring 20 design variants. Which would you choose, and why? What would you do with the other resource if you had it?</p>
+</div>
+
+</section>
+</main>
+
+<footer>
+<p><a href="index.html">← Back to Home</a> | <a href="lesson2.html">Next: The Governing Equations →</a></p>
+</footer>
+<script src="socratic.js" defer></script>
+</body>
+</html>

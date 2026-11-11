@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Module 2: Finite Volume Discretization — CFD Course</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<h1>Module 2: Finite Volume Discretization</h1>
+<p class="subtitle">Reconstruction, Riemann Solvers, Limiters &amp; High-Order Unstructured FV</p>
+</header>
+
+<main>
+<nav class="breadcrumb">
+<a href="index.html">← Course Home</a> | <a href="module1.html">← Previous</a> | <a href="module3.html">Next: Time Integration &amp; Stability →</a>
+</nav>
+
+<section>
+<h2>2.1 Finite Volume Method: Integral Form &amp; Discrete Conservation</h2>
+<p>The FV method discretizes the <strong>integral conservation law</strong> directly. For cell <em>i</em> with volume <em>V_i</em> and faces <em>f</em>:</p>
+<div class="equation-box">
+dU_i/dt = −(1/V_i) ∑_f F_f · n_f A_f + S_i
+</div>
+<p>where <em>U_i = (1/V_i) ∫_{V_i} U dV</em> is the cell average. This guarantees <strong>exact discrete conservation</strong> — fluxes are single-valued at faces: <em>F_f = F(U_L, U_R, n_f)</em>. No numerical cancellation errors.</p>
+
+<h3>Unstructured Mesh Data Structures</h3>
+<p>Cell-centered storage: <em>U_i</em> at cell centroids. Face data: centroid <em>x_f</em>, area <em>A_f</em>, normal <em>n_f</em>, neighbor cells <em>(i, j)</em>. Reconstruction uses cell neighborhoods <em>N(i)</em> — stencil size grows with order.</p>
+
+<h3>Geometric Conservation Law (GCL)</h3>
+<p>For moving/deforming meshes, the scheme must preserve constant states:</p>
+<div class="equation-box">
+d/dt ∫_{V(t)} 1 dV = ∮_∂V w·n dS
+</div>
+<p>where <em>w</em> is mesh velocity. Violation causes spurious mass/momentum sources — critical for FSI and moving-boundary problems.</p>
+</section>
+
+<section>
+<h2>2.2 Reconstruction: From Cell Averages to Face Values</h2>
+<p>High-order accuracy requires reconstructing <em>U(x)</em> within each cell from neighbor averages. For a polynomial of degree <em>k</em>:</p>
+<div class="equation-box">
+U_i(x) = U_i + ∇U_i·(x − x_i) + ½ (x − x_i)^T H_i (x − x_i) + ...
+</div>
+<p>The coefficients (<em>∇U_i, H_i, ...</em>) are determined by a <strong>least-squares fit</strong> over the stencil <em>N(i)</em>:</p>
+<div class="equation-box">
+min_{∇U} ∑_{j∈N(i)} w_{ij} | U_j − U_i − ∇U·(x_j − x_i) |²
+</div>
+<p>where weights <em>w_{ij}</em> typically scale with inverse distance. On highly irregular meshes, <strong>weighted least squares (WLSQ)</strong> with QR factorization is more robust than Gaussian elimination.</p>
+
+<h3>Face Value Evaluation</h3>
+<p>Left/right states at face <em>f</em> between cells <em>i, j</em>:</p>
+<div class="equation-box">
+U_L = U_i(x_f),    U_R = U_j(x_f)
+</div>
+<p>For second-order: <em>U_L = U_i + ∇U_i·(x_f − x_i)</em>. This is a <strong>linear reconstruction</strong>. Higher orders use quadratic or cubic polynomials.</p>
+</section>
+
+<section>
+<h2>2.3 Slope Limiting: Preventing Oscillations Near Discontinuities</h2>
+<p>Unlimited high-order reconstruction produces Gibbs oscillations near shocks. Limiters enforce <strong>TVB (total variation boundedness)</strong> or <strong>MP (maximum principle)</strong> by reducing to first-order locally.</p>
+
+<h3>Barth–Jespersen Limiter (Unstructured)</h3>
+<p>For each cell <em>i</em>, compute unlimited gradient <em>∇U_i</em>. Determine limiter <em>φ_i ∈ [0, 1]</em>:</p>
+<div class="equation-box">
+φ_i = min_{j∈N(i)∪{i}} { min( 1, (U_max − U_i) / (U_j^f − U_i) ), min( 1, (U_min − U_i) / (U_j^f − U_i) ) }
+</div>
+<p>where <em>U_j^f = U_i + ∇U_i·(x_j − x_i)</em>, and <em>U_max/min</em> are the max/min of <em>U</em> in the neighborhood. The limited gradient is <em>φ_i ∇U_i</em>.</p>
+
+<h3>Venkatakrishnan Limiter (Smooth, Differentiable)</h3>
+<p>Uses a smooth function avoiding the <em>min</em> non-differentiability:</p>
+<div class="equation-box">
+φ(r) = (r² + 2r) / (r² + r + 2),    r = (U_max − U_i) / (∇U_i·Δx)
+</div>
+<p>This is <em>C^∞</em> — crucial for discrete adjoint methods and Newton-Krylov solvers.</p>
+
+<h3>WENO Reconstruction on Unstructured Meshes</h3>
+<p>Weighted Essentially Non-Oscillatory reconstruction combines multiple candidate stencils with nonlinear weights based on <strong>smoothness indicators</strong> <em>β_k</em>:</p>
+<div class="equation-box">
+ω_k = α_k / ∑ α_l,    α_k = d_k / (ε + β_k)²
+</div>
+<p>where <em>d_k</em> are linear weights. WENO achieves <strong>optimal order in smooth regions</strong> and <strong>non-oscillatory</strong> at discontinuities without explicit limiting.</p>
+</section>
+
+<section>
+<h2>2.4 Riemann Solvers: The Numerical Flux Function</h2>
+<p>The flux <em>F_f</em> at a face is the solution of a 1D Riemann problem with left/right states <em>U_L, U_R</em> and normal <em>n</em>.</p>
+
+<h3>Exact Riemann Solver</h3>
+<p>Solves the Riemann problem exactly (iteratively) — expensive but robust. Standard for Godunov-type methods in research codes.</p>
+
+<h3>Approximate Riemann Solvers</h3>
+<table>
+<thead>
+<tr><th>Solver</th><th>Waves Resolved</th><th>Cost</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td>Roe</td><td>All (linearized)</td><td>Medium</td><td>Requires entropy fix; fails at vacuum/strong rarefactions</td></tr>
+<tr><td>HLLC</td><td>Contact + acoustic</td><td>Low</td><td>Robust, preserves contact; standard for compressible flow</td></tr>
+<tr><td>HLLE / HLL</td><td>Acoustic only</td><td>Lowest</td><td>Excessive dissipation at contact; good fallback</td></tr>
+<tr><td>AUSM</td><td>Split conv/press</td><td>Low</td><td>Good for all Mach numbers; low-dissipation variants exist</td></tr>
+<tr><td>Rusanev (Lax–Friedrichs)</td><td>Max speed only</td><td>Lowest</td><td>Very dissipative; robust fallback</td></tr>
+</tbody>
+</table>
+
+<h3>HLLC Flux (Recommended Default)</h3>
+<p>Resolves three waves: two acoustic (<em>S_L, S_R</em>) and one contact (<em>S_*</em>). The flux is:</p>
+<div class="equation-box">
+F_HLLC = { F_L + S_L(U_*L − U_L)          if 0 ≤ S_L
+         { F_*L                          if S_L ≤ 0 ≤ S_*
+         { F_*R                          if S_* ≤ 0 ≤ S_R
+         { F_R + S_R(U_*R − U_R)          if S_R ≤ 0
+</div>
+<p>with star-region states computed from Rankine–Hugoniot. Wave speed estimates: <em>S_L = min(u_L − c_L, u_* − c_*)</em>, <em>S_R = max(u_R + c_R, u_* + c_*)</em>, <em>S_* = (p_R − p_L + ρ_L u_L(S_L − u_L) − ρ_R u_R(S_R − u_R)) / (ρ_L(S_L − u_L) − ρ_R(S_R − u_R))</em>.</p>
+</section>
+
+<section>
+<h2>2.5 High-Order FV on Unstructured Meshes</h2>
+
+<h3>k-Exact Reconstruction</h3>
+<p>For order <em>p = k+1</em>, fit a degree-<em>k</em> polynomial to neighbor cell averages. Requires <strong>minimum stencil size</strong>: 1 (0th), 4 (1st, 2D), 10 (2nd, 2D), 20 (3rd, 2D) — in 3D: 1, 8, 35, 120. Use <strong>least squares with larger stencils</strong> for robustness.</p>
+
+<h3>Flux Quadrature for High-Order</h3>
+<p>Face flux integral requires quadrature for <em>p ≥ 2</em>:</p>
+<div class="equation-box">
+∫_f F·n dS ≈ ∑_{q=1}^{N_q} w_q F(U(x_q))·n A_f
+</div>
+<p>Use <strong>Gaussian quadrature</strong> on face: 1 point (1st), 3 points (2nd), 6 points (3rd) for triangles. For polygons, decompose to triangles or use moment-fitted quadrature.</p>
+
+<h3>Limiter for High-Order (Hermite WENO, MOOD, etc.)</h3>
+<p>At <em>p ≥ 3</em>, traditional limiters degrade accuracy. Modern approaches:</p>
+<ul>
+<li><strong>Hermite WENO (HWENO):</strong> Reconstructs both U and ∇U</li>
+<li><strong>MOOD (Multi-dimensional Optimal Order Detection):</strong> A posteriori detection — compute high-order, check admissibility (positivity, TVB), fall back locally</li>
+<li><strong>ADER (Arbitrary high-order DERivative):</strong> One-step space-time predictor + corrector</li>
+</ul>
+</section>
+
+<section>
+<h2>2.6 Viscous Flux Discretization</h2>
+<p>Viscous fluxes depend on <em>∇U</em> at faces. On unstructured meshes, the standard <strong>Green–Gauss</strong> or <strong>least-squares</strong> gradient is used. For second-order viscous terms:</p>
+<div class="equation-box">
+(∇U)_f = (∇U_i + ∇U_j)/2   (average)
+or
+(∇U)_f = ∇U_i + (∇U_j − ∇U_i) · (x_f − x_i)/|x_j − x_i|   (interpolated)
+</div>
+
+<h3>BR2 Scheme (Bassi–Rebay 2)</h3>
+<p>A compact, high-order consistent viscous flux for DG/FV. Introduces a lifting operator to handle the second derivative. Ensures <strong>symmetric positive definite</strong> discrete viscous operator — crucial for implicit solvers.</p>
+
+<h3>Penalty Methods (SIPG, BR2, NIPG)</h3>
+<p>For discontinuous Galerkin and high-order FV, interior penalties enforce continuity of fluxes weakly:</p>
+<div class="equation-box">
+F_v* = {F_v} − η [U]   (symmetric interior penalty)
+</div>
+<p>where <em>η</em> is the penalty parameter (scales as <em>p²/h</em>). Too small → instability; too large → over-diffusion.</p>
+</section>
+
+<section>
+<h2>2.7 Source Term Discretization &amp; Well-Balancing</h2>
+<p>Source terms <em>S(U)</em> (gravity, chemistry, geometry) must be discretized compatibly with fluxes to preserve <strong>steady states</strong> (e.g., hydrostatic equilibrium).</p>
+
+<h3>Well-Balanced Property</h3>
+<p>A scheme is well-balanced for a steady state <em>U^eq</em> if <em>dU/dt = 0</em> exactly when <em>U = U^eq</em>. For hydrostatic equilibrium (<em>dp/dz = −ρg</em>):</p>
+<ul>
+<li>Reconstruct <em>p + ρgz</em> instead of <em>p</em></li>
+<li>Or use <strong>hydrostatic reconstruction</strong> (Audusse et al.)</li>
+</ul>
+<p>Essential for atmospheric/oceanic flows, low-Mach combustion, and MHD.</p>
+</section>
+
+<section class="socratic-section">
+<h2>Socratic Questions</h2>
+
+<div class="socratic" data-question="reconstruction-lsq">
+<p><strong>Question 1:</strong> Derive the normal equations for the weighted least-squares gradient reconstruction on an unstructured mesh. Show that the condition number of the moment matrix depends on the <strong>mesh quality</strong> (orthogonality, aspect ratio). What mesh metrics guarantee a well-conditioned reconstruction?</p>
+</div>
+
+<div class="socratic" data-question="limiter-tvd">
+<p><strong>Question 2:</strong> Prove that the Barth–Jespersen limiter ensures the reconstructed face values lie within the range of cell averages in the neighborhood. Why does this not guarantee <strong>total variation diminishing (TVD)</strong> in multiple dimensions? What additional condition is needed?</p>
+</div>
+
+<div class="socratic" data-question="riemann-hllc">
+<p><strong>Question 3:</strong> Derive the HLLC star-region pressure <em>p_*</em> and velocity <em>u_*</em> from the Rankine–Hugoniot conditions across the contact wave. Show that the HLLC flux reduces to the exact Riemann solution for an isolated contact discontinuity.</p>
+</div>
+
+<div class="socratic" data-question="high-order-fv">
+<p><strong>Question 4:</strong> For a 3rd-order FV scheme on triangles (<em>p = 3</em>), what is the minimum stencil size for k-exact reconstruction? How many quadrature points are needed on each face? Estimate the operation count per cell per stage relative to a 2nd-order scheme.</p>
+</div>
+
+<div class="socratic" data-question="well-balanced">
+<p><strong>Question 5:</strong> Consider the shallow water equations with bathymetry <em>b(x)</em>: <em>h_t + (hu)_x = 0</em>, <em>(hu)_t + (hu² + ½gh²)_x = −gh b_x</em>. Design a well-balanced reconstruction that exactly preserves the <strong>lake-at-rest</strong> steady state (<em>u = 0, h + b = const</em>). Prove it preserves this state discretely.</p>
+</div>
+
+</section>
+</main>
+
+<footer>
+<p><a href="module1.html">← Module 1: Mathematical Foundations</a> | <a href="index.html">Course Home</a> | <a href="module3.html">Next: Time Integration &amp; Stability →</a></p>
+</footer>
+<script src="socratic.js" defer></script>
+</body>
+</html>

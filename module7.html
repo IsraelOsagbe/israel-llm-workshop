@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Module 7: Verification, Validation & UQ — CFD Course</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<h1>Module 7: Verification, Validation &amp; Uncertainty Quantification</h1>
+<p class="subtitle">MMS, Richardson Extrapolation, Discretization Error, Model-Form Uncertainty, Bayesian Calibration</p>
+</header>
+
+<main>
+<nav class="breadcrumb">
+<a href="index.html">← Course Home</a> | <a href="module6.html">← Previous</a> | <a href="module8.html">Next: High-Performance Implementation →</a>
+</nav>
+
+<section>
+<h2>7.1 Verification vs. Validation: Definitions &amp; Hierarchy</h2>
+
+<h3>Verification: "Are we solving the equations right?"</h3>
+<p><strong>Code Verification:</strong> Does the code correctly implement the intended mathematical model? Methods: Method of Manufactured Solutions (MMS), order-of-accuracy tests, symmetry/invariance tests.</p>
+
+<p><strong>Solution Verification:</strong> For a specific simulation, estimate the numerical errors (discretization, iteration, round-off). Quantify uncertainty in the computed solution.</p>
+
+<h3>Validation: "Are we solving the right equations?"</h3>
+<p>Compare simulation results to <strong>independent experimental data</strong> for the same physical configuration. Quantify the difference relative to combined uncertainties (numerical + experimental).</p>
+
+<h3>V&amp;V Hierarchy (AIAA G-077)</h3>
+<ol>
+<li><strong>Level 0:</strong> Code verification (MMS, analytic solutions)</li>
+<li><strong>Level 1:</strong> Canonical flows (flat plate BL, cylinder, backward-facing step, Taylor–Green vortex)</li>
+<li><strong>Level 2:</strong> Component flows (airfoil, nozzle, diffuser, combustor sector)</li>
+<li><strong>Level 3:</strong> System flows (full aircraft, engine, vehicle)</li>
+</ol>
+<p>Validate at the lowest level possible before trusting higher-level predictions.</p>
+</section>
+
+<section>
+<h2>7.2 Code Verification: Method of Manufactured Solutions (MMS)</h2>
+<p>Choose an arbitrary smooth <strong>manufactured solution</strong> <em>U_m(x,t)</em> that satisfies BCs. Substitute into the PDE to obtain a <strong>manufactured source term</strong> <em>S_m</em>:</p>
+<div class="equation-box">
+S_m = ∂U_m/∂t + ∇·F(U_m) − ∇·F_v(U_m, ∇U_m)
+</div>
+<p>Solve the modified PDE with source <em>S_m</em>. The exact solution is <em>U_m</em>. Compute error <em>E = U_h − U_m</em> and verify observed order <em>p_obs = log(||E_h||/||E_{2h}||) / log(2)</em> matches theoretical order.</p>
+
+<h3>MMS Best Practices</h3>
+<ul>
+<li>Use <strong>trigonometric/hyperbolic functions</strong> (non-polynomial) to exercise all derivative terms</li>
+<li>Manufacture solution in <strong>primitive variables</strong>, convert to conserved for source term</li>
+<li>Test on <strong>irregular/unstructured meshes</strong> (not just Cartesian)</li>
+<li>Test <strong>boundary condition implementation</strong> separately (manufactured solution must satisfy BCs)</li>
+<li>Test <strong>source term integration</strong> (geometric source, chemistry, radiation)</li>
+</ul>
+
+<h3>Order-of-Accuracy Test Protocol</h3>
+<ol>
+<li>Generate mesh sequence: <em>h, h/2, h/4, ...</em> (uniform refinement)</li>
+<li>Compute error norms: <em>L_1, L_2, L_∞</em></li>
+<li>Fit <em>log(||E||) = log(C) + p log(h)</em> via linear regression</li>
+<li>Accept if <em>|p_obs − p_theory| < 0.1</em> for fine meshes</li>
+</ol>
+</section>
+
+<section>
+<h2>7.3 Solution Verification: Discretization Error Estimation</h2>
+
+<h3>Richardson Extrapolation (Single Grid)</h3>
+<p>Assume <em>U_h = U_exact + C h^p + O(h^{p+1})</em>. On three grids <em>h, h/r, h/r²</em> (r ≥ 2):</p>
+<div class="equation-box">
+U_exact ≈ U_h + (U_h − U_{h/r}) / (r^p − 1)
+Error estimate: E_h ≈ (U_h − U_{h/r}) / (r^p − 1)
+</div>
+<p>Requires <strong>asymptotic range</strong> (mesh fine enough that higher-order terms negligible). Verify with <em>p_obs</em> from grid convergence study.</p>
+
+<h3>Grid Convergence Index (GCI) — Roache (1994, 1997)</h3>
+<p>Standardized error band for engineering use:</p>
+<div class="equation-box">
+GCI = F_s |U_h − U_{h/r}| / (r^p − 1)
+</div>
+<p>where <em>F_s = 1.25</em> (factor of safety for 3+ grids) or <em>3.0</em> (2 grids only). <strong>GCI represents a 95% confidence interval</strong> on the discretization error.</p>
+
+<h3>Grid Convergence Study Requirements (ASME V&amp;V 20)</h3>
+<ul>
+<li>Minimum <strong>3 significantly different grids</strong> (refinement ratio r ≥ 1.3, preferably 2)</li>
+<li>Mesh refinement must be <strong>systematic</strong> (same topology, uniform scaling)</li>
+<li>Monitor <em>p_obs</em> — must approach theoretical <em>p</em> on finest grids</li>
+<li>If <em>p_obs</em> degrades: not in asymptotic range, or coding error, or singularities</li>
+<li>Report <em>U_exact</em>, <em>E_h</em>, <em>GCI</em>, <em>p_obs</em> for each QoI</li>
+</ul>
+
+<h3>Generalized Richardson Extrapolation (Non-Asymptotic)</h3>
+<p>If not in asymptotic range, use <strong>Courant's method</strong> or <strong>least-squares fit</strong> of <em>U_h = U_exact + C h^p</em> over all grids. More robust but less theoretically grounded.</p>
+</section>
+
+<section>
+<h2>7.4 Iteration &amp; Round-off Error</h2>
+
+<h3>Iteration Convergence Criteria</h3>
+<ul>
+<li><strong>Residual reduction:</strong> 3–4 orders of magnitude (steady RANS)</li>
+<li><strong>QoI stabilization:</strong> Drag, lift, pressure drop change < 0.1% over 100 iterations</li>
+<li><strong>Global balances:</strong> Mass, momentum, energy conserved to machine precision</li>
+</ul>
+
+<h3>Iteration Error Estimation</h3>
+<p>For iterative linear solvers (Krylov): <em>||r_k|| / ||r_0|| < ε</em>. For nonlinear: <em>||F(U^k)|| < ε ||F(U^0)||</em>. The iteration error in QoI is bounded by the residual tolerance times the condition number of the QoI functional.</p>
+
+<h3>Round-off Error</h3>
+<p>Double precision: <em>ε_mach ≈ 2×10⁻¹⁶</em>. Accumulated error in SpMV: <em>O(ε_mach N_nz)</em>. For N=10⁷, N_nz=10⁸ → ~10⁻⁸ relative error. Usually negligible vs. discretization error, but can limit achievable residual in tight-tolerance solves.</p>
+</section>
+
+<section>
+<h2>7.5 Model-Form Uncertainty &amp; Validation Metrics</h2>
+
+<h3>Validation Comparison Error</h3>
+<p>For a QoI <em>Q</em>: <em>E = Q_{sim} − Q_{exp}</em>. Total uncertainty:</p>
+<div class="equation-box">
+U_{total} = √(U_{num}² + U_{exp}² + U_{input}² + U_{model}²)
+</div>
+<p>Validation passes if <em>|E| ≤ U_{total}</em> (at 95% confidence).</p>
+
+<h3>Model-Form Uncertainty (The Hard Part)</h3>
+<p>Turbulence model inadequacy is the dominant uncertainty in most RANS simulations. Approaches:</p>
+<ul>
+<li><strong>Elicitation:</strong> Expert judgment (structured, documented)</li>
+<li><strong>Multiple models:</strong> Spread of predictions across models (SST, SA, RSM, etc.)</li>
+<li><strong>Bayesian model averaging:</strong> Weight models by evidence</li>
+<li><strong>Discrepancy modeling (Kennedy–O'Hagan):</strong> <em>y(x) = η(x,θ) + δ(x) + ε</em> where <em>η</em> is simulation, <em>δ</em> is model discrepancy (GP), <em>ε</em> is observation noise</li>
+</ul>
+
+<h3>Validation Metrics</h3>
+<table>
+<thead>
+<tr><th>Metric</th><th>Formula</th><th>Interpretation</th></tr>
+</thead>
+<tbody>
+<tr><td>Relative error</td><td>|Q_s − Q_e| / |Q_e|</td><td>Simple, scale-dependent</td></tr>
+<tr><td>Validation uncertainty</td><td>U_val = √(U_num² + U_exp²)</td><td>Standard engineering metric</td></tr>
+<tr><td>Area metric (Oberkampf)</td><td>∫ |F_s(x) − F_e(x)| dx</td><td>For field comparisons (profiles, contours)</td></tr>
+<tr><td>Bayes factor</td><td>p(D|M) / p(D|¬M)</td><td>Model plausibility given data</td></tr>
+</tbody>
+</table>
+</section>
+
+<section>
+<h2>7.6 Input Uncertainty Propagation</h2>
+<p>Sources: BCs (inlet profile, turbulence intensity), geometry tolerances, material properties, fluid properties.</p>
+
+<h3>Propagation Methods</h3>
+<ul>
+<li><strong>Local sensitivity:</strong> <em>dQ/dθ_i</em> via adjoint or finite differences — cheap, linear only</li>
+<li><strong>Monte Carlo:</strong> Sample inputs, run simulation — expensive, non-intrusive</li>
+<li><strong>Polynomial Chaos Expansion (PCE):</strong> <em>Q(ξ) = ∑ c_α Ψ_α(ξ)</em> — spectral convergence for smooth responses</li>
+<li><strong>Stochastic Collocation:</strong> Sparse grid quadrature (Smolyak) — efficient for moderate dimensions</li>
+<li><strong>Multi-fidelity:</strong> Combine low-fidelity (many samples) + high-fidelity (few samples) via control variates or co-kriging</li>
+</ul>
+
+<h3>Global Sensitivity Analysis (Sobol Indices)</h3>
+<p>Decompose output variance: <em>Var[Q] = ∑ V_i + ∑ V_{ij} + ...</em>. First-order index <em>S_i = V_i / Var[Q]</em> measures main effect of input <em>i</em>. Total-order index <em>S_{Ti}</em> includes all interactions.</p>
+</section>
+
+<section>
+<h2>7.7 Bayesian Calibration of Model Parameters</h2>
+<p>Calibrate turbulence model coefficients <em>θ</em> against experimental data <em>D</em>:</p>
+<div class="equation-box">
+p(θ|D) ∝ p(D|θ) p(θ)
+</div>
+<p>where <em>p(D|θ) = ∫ p(D|η,θ) p(η|θ) dη</em> is the marginal likelihood. The forward model <em>η(θ)</em> is the CFD simulation.</p>
+
+<h3>Challenges</h3>
+<ul>
+<li>Forward model is expensive (hours/days per sample)</li>
+<li>High-dimensional parameter space (5–20 coefficients)</li>
+<li>Model discrepancy <em>δ(x)</em> must be included to avoid overfitting</li>
+<li>MCMC requires 10⁴–10⁵ samples — use surrogates (GP, PCE, NN)</li>
+</ul>
+
+<h3>Surrogate-Based Calibration</h3>
+<ol>
+<li>Build Gaussian Process (GP) or PCE surrogate of <em>Q(θ)</em> from ~50–200 CFD runs</li>
+<li>Run MCMC on surrogate (millions of samples, seconds each)</li>
+<li>Validate posterior predictions with additional CFD runs</li>
+</ol>
+</section>
+
+<section>
+<h2>7.8 Practical V&amp;V Workflow for a CFD Project</h2>
+
+<h3>Phase 1: Code Verification (Before Production Runs)</h3>
+<ol>
+<li>Run MMS on all physics modules (inviscid, viscous, heat transfer, chemistry, etc.)</li>
+<li>Verify order-of-accuracy on uniform and stretched meshes</li>
+<li>Test conservation properties (mass, momentum, energy) to machine precision</li>
+<li>Test symmetry/invariance (grid rotation, Galilean boost)</li>
+</ol>
+
+<h3>Phase 2: Solution Verification (Per Simulation)</h3>
+<ol>
+<li>Generate 3+ mesh sequence (coarse/medium/fine)</li>
+<li>Run all to same convergence criteria</li>
+<li>Compute QoI on each grid, perform Richardson extrapolation</li>
+<li>Report <em>U_exact</em>, <em>GCI</em>, <em>p_obs</em> for each QoI</li>
+<li>If <em>p_obs</em> < theoretical: investigate (singularity, BC error, limiter activation)</li>
+</ol>
+
+<h3>Phase 3: Validation (If Experimental Data Exists)</h3>
+<ol>
+<li>Identify validation dataset (same geometry, Re, Ma, BCs)</li>
+<li>Quantify experimental uncertainty <em>U_exp</em> (Type A + Type B)</li>
+<li>Compare QoI: compute <em>E</em>, <em>U_total</em></li>
+<li>If <em>|E| > U_total</em>: diagnose (model-form, input uncertainty, experimental error)</li>
+<li>Document <strong>validation domain</strong> (range of conditions where validated)</li>
+</ol>
+
+<h3>Phase 4: UQ for Predictive Simulations</h3>
+<ol>
+<li>Identify uncertain inputs (BCs, geometry, properties)</li>
+<li>Propagate uncertainties (local sensitivity → PCE/MC as needed)</li>
+<li>Quantify model-form uncertainty (multiple models, discrepancy)</li>
+<li>Report prediction interval: <em>Q_pred ± U_total</em></li>
+</ol>
+</section>
+
+<section class="socratic-section">
+<h2>Socratic Questions</h2>
+
+<div class="socratic" data-question="mms-derivation">
+<p><strong>Question 1:</strong> For the 2D compressible Euler equations, choose a manufactured solution <em>ρ = 1 + 0.2 sin(2πx) cos(2πy)</em>, <em>u = cos(2πx) sin(2πy)</em>, <em>v = −sin(2πx) cos(2πy)</em>, <em>p = 1 + 0.1 cos(2πx) sin(2πy)</em>. Derive the manufactured source terms <em>S_m</em> for the continuity, x-momentum, y-momentum, and energy equations. Show that the source terms are non-zero and exercise all flux Jacobian entries.</p>
+</div>
+
+<div class="socratic" data-question="richardson-gci">
+<p><strong>Question 2:</strong> A grid convergence study for drag coefficient yields: <em>C_d(1M) = 0.0321, C_d(4M) = 0.0308, C_d(16M) = 0.0305</em>. Assuming 2nd-order spatial accuracy and refinement ratio <em>r = 2</em> (since 4M/1M = 4 = r² in 2D), compute the Richardson extrapolated <em>C_d_exact</em>, the estimated error on the 4M grid, and the GCI (95% confidence) for the 4M grid. Is the solution in the asymptotic range?</p>
+</div>
+
+<div class="socratic" data-question="model-form-uq">
+<p><strong>Question 3:</strong> You have RANS predictions for a separated flow using three models: SST (C_d = 0.042), SA (C_d = 0.038), RSM (C_d = 0.045). Experimental value: 0.040 ± 0.002. The numerical uncertainty on the medium grid is ±0.001. Quantify the model-form uncertainty using (a) the spread of model predictions, (b) the Kennedy–O'Hagan discrepancy approach. Which model(s) pass validation? What does this tell you about the reliability of RANS for this flow?</p>
+</div>
+
+<div class="socratic" data-question="bayesian-calibration">
+<p><strong>Question 4:</strong> In Bayesian calibration of the SST model coefficients <em>θ = (β*, a_1, κ, ...)</em> against flat-plate skin friction data, the likelihood is <em>p(D|θ) = N(D; η(θ), Σ_exp + Σ_num)</em>. Explain why <strong>model discrepancy</em> must be included in the covariance. If you omit <em>δ(x)</em>, what happens to the posterior as the number of data points increases? How would you parameterize <em>δ(x)</em> as a Gaussian Process?</p>
+</div>
+
+<div class="socratic" data-question="uq-propagation">
+<p><strong>Question 5:</strong> For a transonic airfoil simulation, the uncertain inputs are: Mach number (Ma = 0.75 ± 0.01), angle of attack (α = 1.25° ± 0.05°), turbulence intensity (TI = 0.1% ± 0.05%), wall temperature (T_w = 300 K ± 5 K). Design a <strong>sparse grid stochastic collocation</strong> study using Smolyak quadrature with level 3. How many CFD runs are needed? If each run takes 2 hours, what is the total compute time? How would you use the results to compute Sobol indices for each input?</p>
+</div>
+
+</section>
+</main>
+
+<footer>
+<p><a href="module6.html">← Module 6: Turbulence Modeling</a> | <a href="index.html">Course Home</a> | <a href="module8.html">Next: High-Performance Implementation →</a></p>
+</footer>
+<script src="socratic.js" defer></script>
+</body>
+</html>

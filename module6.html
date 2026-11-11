@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Module 6: Turbulence Modeling — CFD Course</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<h1>Module 6: Turbulence Modeling</h1>
+<p class="subtitle">RANS Closures, Scale-Resolving (LES/DES/WMLES), Wall Models, Data-Driven</p>
+</header>
+
+<main>
+<nav class="breadcrumb">
+<a href="index.html">← Course Home</a> | <a href="module5.html">← Previous</a> | <a href="module7.html">Next: Verification, Validation &amp; UQ →</a>
+</nav>
+
+<section>
+<h2>6.1 The Turbulence Closure Problem</h2>
+<p>Reynolds decomposition: <em>u = ū + u'</em>, <em>p = p̄ + p'</em>. Averaging NSE gives:</p>
+<div class="equation-box">
+∂ū/∂t + ū·∇ū = −∇p̄/ρ + ν∇²ū − ∇·(u'u') + f
+</div>
+<p>The <strong>Reynolds stress tensor</strong> <em>R_{ij} = −u'_i u'_j</em> is unclosed — 6 independent components in 3D. The <strong>closure problem</strong> is to model <em>R</em> in terms of mean flow quantities.</p>
+
+<h3>Exact Transport Equations for Reynolds Stresses</h3>
+<p>From the fluctuating momentum equation:</p>
+<div class="equation-box">
+D R_{ij}/Dt = P_{ij} + Π_{ij} + D_{ij} − ε_{ij} + D^t_{ij} + D^p_{ij}
+</div>
+<ul>
+<li><strong>Production:</strong> <em>P_{ij} = −R_{ik} ∂ū_j/∂x_k − R_{jk} ∂ū_i/∂x_k</em></li>
+<li><strong>Pressure-strain:</strong> <em>Π_{ij} = p'(∂u'_i/∂x_j + ∂u'_j/∂x_i)</em> (redistributes energy among components)</li>
+<li><strong>Diffusion:</strong> <em>D_{ij} = ∂/∂x_k (ν ∂R_{ij}/∂x_k − u'_i u'_j u'_k − δ_{ik} p' u'_j /ρ − δ_{jk} p' u'_i /ρ)</em></li>
+<li><strong>Dissipation:</strong> <em>ε_{ij} = 2ν ∂u'_i/∂x_k ∂u'_j/∂x_k</em> (isotropic at small scales: <em>ε_{ij} = ⅔ε δ_{ij}</em>)</li>
+</ul>
+<p>Any RANS model must approximate the unclosed terms (<em>Π, D, ε</em>).</p>
+</section>
+
+<section>
+<h2>6.2 Eddy Viscosity Models (Boussinesq Hypothesis)</h2>
+<p>Assume <em>R_{ij} = ν_t (∂ū_i/∂x_j + ∂ū_j/∂x_i) − ⅔ k δ_{ij}</em> where <em>k = ½ R_{ii}</em>.</p>
+
+<h3>Zero-Equation (Algebraic) Models</h3>
+<ul>
+<li><strong>Prandtl mixing length:</strong> <em>ν_t = l_m² |∂ū/∂y|</em> — simple, attached boundary layers only</li>
+<li><strong>Baldwin–Lomax:</strong> Inner/outer layer algebraic model — legacy, still used in aerospace</li>
+<li><strong>Cebeci–Smith:</strong> Two-layer algebraic model</li>
+</ul>
+
+<h3>One-Equation Models</h3>
+<ul>
+<li><strong>Spalart–Allmaras (SA):</strong> Transport equation for <em>ν̃</em> (modified ν_t). 1 equation, robust, widely used in aerospace. Includes trip term, wall-damping, rotation correction (SA-RC).</li>
+<li><strong>k-equation only:</strong> <em>ν_t = C_μ k^{1/2} l</em> with prescribed <em>l</em> — rarely used alone</li>
+</ul>
+
+<h3>Two-Equation Models (The Workhorses)</h3>
+<table>
+<thead>
+<tr><th>Model</th><th>Variables</th><th>Strengths</th><th>Weaknesses</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>k–ε (Standard)</strong></td><td>k, ε</td><td>Robust, free shear layers, jet/plume</td><td>Adverse pressure gradient, separation, near-wall (needs wall functions)</td></tr>
+<tr><td><strong>RNG k–ε</strong></td><td>k, ε</td><td>Better for swirling, separation</td><td>Still poor near-wall</td></tr>
+<tr><td><strong>Realizable k–ε</strong></td><td>k, ε</td><td>Boundedness, planar jets</td><td>Similar near-wall issues</td></tr>
+<tr><td><strong>k–ω (Wilcox)</strong></td><td>k, ω</td><td>Near-wall integration (no wall functions), separation</td><td>Free-stream sensitivity, cross-diffusion</td></tr>
+<tr><td><strong>k–ω SST (Menter)</strong></td><td>k, ω/ε</td><td>Blends k–ω (wall) + k–ε (free stream); <strong>industry default</strong></td><td>Still eddy viscosity — isotropic assumption</td></tr>
+</tbody>
+</table>
+
+<h3>SST Model Details</h3>
+<p>Blending function <em>F_1</em> switches between k–ω (inner) and transformed k–ε (outer):</p>
+<div class="equation-box">
+ν_t = a_1 k / max(a_1 ω, S F_2)
+</div>
+<p>where <em>S = √(2S_{ij}S_{ij})</em>. Includes <strong>production limiter</strong> (Kato–Launder) and <strong>cross-diffusion term</strong> in ω-equation. <em>γ-Re_θ</em> transition model extension available.</p>
+</section>
+
+<section>
+<h2>6.3 Reynolds Stress Models (RSM / Second-Moment Closures)</h2>
+<p>Solve transport equations for all 6 <em>R_{ij}</em> + <em>ε</em> (7 equations). No Boussinesq hypothesis — captures anisotropy, streamline curvature, rotation effects.</p>
+
+<h3>Modeling Unclosed Terms</h3>
+<ul>
+<li><strong>Pressure-strain (Π_{ij}):</strong> LRR (Launder–Reece–Rodi), SSG (Speziale–Sarkar–Gatski), quadratic models</li>
+<li><strong>Dissipation (ε_{ij}):</strong> Assumed isotropic: <em>ε_{ij} = ⅔ε δ_{ij}</em> (main limitation)</li>
+<li><strong>Diffusion:</strong> Generalized gradient diffusion hypothesis (GGDH)</li>
+</ul>
+
+<h3>Challenges</h3>
+<ul>
+<li>Stiff, coupled system — difficult convergence</li>
+<li>Wall-reflection terms needed for near-wall behavior</li>
+<li>Realizability not guaranteed (negative normal stresses)</li>
+<li>Computational cost: 7× scalar equations vs. 2 for k–ω SST</li>
+</ul>
+<p>Use RSM when: swirling flow, strong curvature, rotation, secondary flows, anisotropy matters (e.g., turbomachinery, combustors).</p>
+</section>
+
+<section>
+<h2>6.4 Scale-Resolving Simulations: LES, DES, WMLES</h2>
+
+<h3>Large Eddy Simulation (LES)</h3>
+<p>Filter at scale <em>Δ</em> (grid): <em>ū = G * u</em>. Resolved scales > <em>Δ</em> computed directly; subgrid scales (SGS) modeled.</p>
+
+<div class="equation-box">
+∂ū/∂t + ∇·(ūū) = −∇p̄/ρ + ν∇²ū − ∇·τ^{SGS}
+τ^{SGS} = ūū − ū ū
+</div>
+
+<h4>SGS Models</h4>
+<ul>
+<li><strong>Smagorinsky:</strong> <em>τ^{SGS}_{ij} − ⅓ τ^{SGS}_{kk} δ_{ij} = −2 (C_s Δ)² |S̄| S̄_{ij}</em> — excessive dissipation, wrong near-wall scaling</li>
+<li><strong>Dynamic Smagorinsky (Germano):</strong> <em>C_s</em> computed from test filter — backscatter possible, needs averaging</li>
+<li><strong>WALE (Wall-Adapting Local Eddy-viscosity):</strong> Correct <em>ν_t ~ y³</em> near wall — no dynamic procedure needed</li>
+<li><strong>Vreman:</strong> Zero for 2D/laminar, lower dissipation in transition</li>
+<li><strong>Sigma (Nicoud):</strong> Based on singular values of velocity gradient — good for transition</li>
+</ul>
+
+<h3>LES Resolution Requirements</h3>
+<p><em>Δx⁺ ~ 50–100, Δy⁺_wall ~ 1, Δz⁺ ~ 15–30</em>. Wall-resolved LES at Re_τ = 1000 needs ~10⁹ cells. Cost ~ Re³.</p>
+
+<h3>Detached Eddy Simulation (DES)</h3>
+<p>Hybrid RANS/LES: <em>ν_t = min(ν_t^{RANS}, C_{DES} Δ)</em>. RANS near wall, LES in separated regions.</p>
+<ul>
+<li><strong>SA-DES, SST-DES:</strong> Based on underlying RANS model</li>
+<li><strong>DDES (Delayed DES):</strong> Shields boundary layer from premature LES switch</li>
+<li><strong>IDDES (Improved DDES):</strong> Wall-modeling + free-stream protection</li>
+</ul>
+
+<h3>Wall-Modeled LES (WMLES)</h3>
+<p>LES in outer layer, <strong>wall model</strong> provides shear stress at first grid point (<em>y⁺ ~ 50–200</em>):</p>
+<ul>
+<li><strong>Equilibrium wall model:</strong> Log-law + pressure gradient</li>
+<li><strong>Non-equilibrium (ODE/PDE) wall model:</strong> Solves 1D boundary layer equations on embedded grid</li>
+<li><strong>Zonal WMLES:</strong> RANS near wall, LES outer, blending region</li>
+</ul>
+<p>Cost reduction: ~10–100× vs. wall-resolved LES. Standard for high-Re external aerodynamics.</p>
+</section>
+
+<section>
+<h2>6.5 Wall Models for High-Re Flows</h2>
+
+<h3>Wall Functions (RANS)</h3>
+<p>Bridge viscous sublayer: <em>u⁺ = u_τ y⁺</em> (viscous), <em>u⁺ = 1/κ ln(y⁺) + B</em> (log-law). Standard: <em>y⁺ ∈ [30, 300]</em>. Enhanced wall treatment: two-layer (Wolfshtein) or scalable wall functions.</p>
+
+<h3>Wall-Models for LES/WMLES</h3>
+<table>
+<thead>
+<tr><th>Type</th><th>Equation</th><th>Cost</th><th>Accuracy</th></tr>
+</thead>
+<tbody>
+<tr><td>Equilibrium (log-law)</td><td>Algebraic</td><td>Negligible</td><td>Fails for separation, strong PG</td></tr>
+<tr><td>Thin boundary layer (TBL)</td><td>1D PDE in y</td><td>Low</td><td>Captures non-equilibrium, unsteady</td></tr>
+<tr><td>Integral boundary layer</td><td>Momentum integral</td><td>Low</td><td>Good for attached flows</td></tr>
+<tr><td>Data-driven (ML)</td><td>NN trained on DNS</td><td>Low (inference)</td><td>Promising, generalization?</td></tr>
+</tbody>
+</table>
+
+<h3>Key Challenge: Coupling</h3>
+<p>Wall model provides <em>τ_w</em> to LES; LES provides <em>u_∥, p</em> at matching height. Consistency requires <strong>matching location in log-layer</strong> and <strong>time-accurate coupling</strong> for unsteady flows.</p>
+</section>
+
+<section>
+<h2>6.6 Data-Driven &amp; Machine Learning Closures</h2>
+
+<h3>Categories</h3>
+<ul>
+<li><strong>Field inversion / Bayesian calibration:</strong> Optimize model coefficients (e.g., <em>C_μ, C_ε1</em>) against data</li>
+<li><strong>Discrepancy modeling:</strong> Learn <em>δ = R^{DNS} − R^{RANS}</em> as function of mean flow features</li>
+<li><strong>Physics-informed neural networks (PINNs):</strong> Embed PDE residuals in loss function</li>
+<li><strong>End-to-end closure:</strong> NN maps mean flow → Reynolds stress (Galilean invariant architectures: tensor basis, invariants)</li>
+<li><strong>SGS models for LES:</strong> NN maps resolved strain/rotation → τ^{SGS}</li>
+</ul>
+
+<h3>Tensor Basis Neural Networks (TBNN)</h3>
+<p>Enforce Galilean invariance by expressing <em>R_{ij}</em> as linear combination of tensor basis <em>T^{(k)}_{ij}</em> with scalar coefficients <em>g^{(k)}(λ_1, ..., λ_n)</em> where <em>λ</em> are invariants of <em>S, Ω</em>:</p>
+<div class="equation-box">
+R_{ij} = 2k ∑_{k=1}^{10} g^{(k)}(λ) T^{(k)}_{ij}
+</div>
+<p>10 basis tensors for general 3D flow (Pope, 1975). NN learns <em>g^{(k)}</em> from DNS data.</p>
+
+<h3>Challenges</h3>
+<ul>
+<li>Extrapolation beyond training regime</li>
+<li>Stability when coupled to solver (stiffness, realizability)</li>
+<li>Data scarcity for high-Re, complex geometries</li>
+<li>Enforcing physical constraints (realizability, symmetry, Galilean invariance)</li>
+</ul>
+</section>
+
+<section>
+<h2>6.7 Transition Modeling</h2>
+<p>RANS models assume fully turbulent. For transitional flows (turbomachinery, low-Re airfoils):</p>
+
+<ul>
+<li><strong>γ–Re_θ (Langtry–Menter):</strong> Transport equations for intermittency <em>γ</em> and transition momentum thickness <em>Re_θ</em>. Coupled to SST.</li>
+<li><strong>k–kL–ω (Walters–Cokljat):</strong> 3-equation model for laminar kinetic energy.</li>
+<li><strong>DDES/IDDES with transition:</strong> Shielding functions prevent premature LES in laminar regions.</li>
+<li><strong>LES/DNS of transition:</strong> Resolve bypass, natural, separation-induced transition directly.</li>
+</ul>
+</section>
+
+<section>
+<h2>6.8 Model Selection Guidelines</h2>
+<table>
+<thead>
+<tr><th>Flow Type</th><th>Recommended</th><th>Alternative</th></tr>
+</thead>
+<tbody>
+<tr><td>Attached boundary layer, moderate APG</td><td>SST k–ω</td><td>SA, k–ε</td></tr>
+<tr><td>Separation, strong curvature, rotation</td><td>SST k–ω, RSM</td><td>DES/WMLES</td></tr>
+<tr><td>Free shear layers, jets, mixing</td><td>k–ε (realizable)</td><td>SST</td></tr>
+<tr><td>High-Re external aero (drag, noise)</td><td>WMLES, DDES/IDDES</td><td>SST (with care)</td></tr>
+<tr><td>Internal flow, heat transfer</td><td>SST, k–ε realizable</td><td>RSM (if secondary flows)</td></tr>
+<tr><td>Combustion, reacting flow</td><td>SST + PDF/flamelet</td><td>LES (if feasible)</td></tr>
+<tr><td>Transition-sensitive (turbomachinery)</td><td>γ–Re_θ SST</td><td>k–kL–ω</td></tr>
+<tr><td>Fundamental research, validation</td><td>DNS, wall-resolved LES</td><td>—</td></tr>
+</tbody>
+</table>
+</section>
+
+<section class="socratic-section">
+<h2>Socratic Questions</h2>
+
+<div class="socratic" data-question="reynolds-stress">
+<p><strong>Question 1:</strong> Starting from the fluctuating momentum equation, derive the exact transport equation for the Reynolds stress tensor <em>R_{ij} = u'_i u'_j</em>. Identify all unclosed terms. For the pressure-strain correlation <em>Π_{ij}</em>, explain the physical meaning of the <strong>slow</strong> (return-to-isotropy) and <strong>rapid</strong> (mean strain/rotation) parts in the LRR model.</p>
+</div>
+
+<div class="socratic" data-question="sst-blending">
+<p><strong>Question 2:</strong> In the SST k–ω model, the blending function <em>F_1</em> transitions from k–ω (near wall) to k–ε (free stream). Derive the transformed k–ε equations in terms of ω (using <em>ω = ε/(β* k)</em>). Show that the cross-diffusion term <em>2ρ/ω ∂k/∂x_j ∂ω/∂x_j</em> appears naturally in the ω-equation. Why is this term critical for the blending?</p>
+</div>
+
+<div class="socratic" data-question="les-resolution">
+<p><strong>Question 3:</strong> For wall-resolved LES of channel flow at Re_τ = 1000, estimate the total grid points needed using <em>Δx⁺ = 100, Δy⁺_wall = 1, Δz⁺ = 20</em> in a domain <em>L_x = 2πδ, L_z = πδ</em>. Compare the cost to RANS (assume 10⁵ cells). At what Re_τ does wall-resolved LES become infeasible on current supercomputers (assume 10¹² cells max)?</p>
+</div>
+
+<div class="socratic" data-question="des-logic">
+<p><strong>Question 4:</strong> In DES, the length scale is <em>l_{DES} = min(l_{RANS}, C_{DES} Δ)</em>. Explain why <strong>grid-induced separation (GIS)</strong> occurs in attached boundary layers on fine grids. How does DDES (Delayed DES) fix this using the wall-distance based shielding function <em>f_d</em>? Derive the condition for <em>f_d = 1</em> (pure RANS) vs. <em>f_d = 0</em> (pure LES).</p>
+</div>
+
+<div class="socratic" data-question="ml-closure">
+<p><strong>Question 5:</strong> A tensor basis neural network (TBNN) expresses the Reynolds stress anisotropy <em>b_{ij} = R_{ij}/(2k) − ⅓ δ_{ij}</em> as <em>b_{ij} = ∑_{k=1}^{10} g^{(k)}(λ) T^{(k)}_{ij}</em>. List the 10 basis tensors <em>T^{(k)}</em> for 3D flow. How many independent invariants <em>λ</em> are there for the symmetric strain-rate <em>S_{ij}</em> and antisymmetric rotation-rate <em>Ω_{ij}</em>? Why does this architecture guarantee Galilean invariance and coordinate rotation invariance?</p>
+</div>
+
+</section>
+</main>
+
+<footer>
+<p><a href="module5.html">← Module 5: Incompressible Flow Algorithms</a> | <a href="index.html">Course Home</a> | <a href="module7.html">Next: Verification, Validation &amp; UQ →</a></p>
+</footer>
+<script src="socratic.js" defer></script>
+</body>
+</html>
